@@ -47,6 +47,10 @@ export const api = {
     request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body: { email: string; password: string }) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  verifyOtp: (body: { challenge_id: string; code: string }) =>
+    request('/auth/verify-otp', { method: 'POST', body: JSON.stringify(body) }),
+  resendOtp: (body: { challenge_id: string }) =>
+    request('/auth/resend-otp', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request('/auth/me'),
 
   changePassword: (body: { current_password: string; new_password: string }) =>
@@ -70,15 +74,9 @@ export const api = {
   deposit: (body: { account_id: string; amount: number | string; description?: string; reference?: string }) =>
     request('/deposits', {
       method: 'POST',
-      body: JSON.stringify({
-        account_id: body.account_id,
-        amount: typeof body.amount === 'string' ? parseFloat(body.amount) : body.amount,
-        reference: body.reference || body.description,
-      }),
+      body: JSON.stringify(body),
     }),
-  withdraw: async (_body: any) => {
-    throw new Error('Withdrawals must be arranged with client services. Use Transfers to move money between your accounts.');
-  },
+
   createRequest: (body: any) => request('/requests', { method: 'POST', body: JSON.stringify(body) }),
   myRequests: () => request('/requests/mine'),
 
@@ -94,8 +92,8 @@ export const api = {
   adjustBalance: (body: {
     account_id: string;
     amount: number;
-    adjustment_type?: 'credit' | 'debit';
     reason?: string;
+    adjustment_type?: string;
   }) => {
     const signed =
       body.adjustment_type === 'debit' ? -Math.abs(Number(body.amount)) : Math.abs(Number(body.amount));
@@ -127,6 +125,12 @@ export const api = {
   createDepositRequest: (body: { account_id: string; amount: number; reference?: string }) =>
     request('/deposits', { method: 'POST', body: JSON.stringify(body) }),
   getMyDeposits: () => request('/deposits'),
+  createWithdrawal: (body: { account_id: string; amount: number; destination?: string; reference?: string }) =>
+    request('/withdrawals', { method: 'POST', body: JSON.stringify(body) }),
+  getMyWithdrawals: () => request('/withdrawals'),
+  adminWithdrawals: (status = 'all') => adminRequest(`/admin/withdrawals?status=${status}`),
+  reviewWithdrawal: (id: string, body: { status: string; admin_note?: string }) =>
+    adminRequest(`/admin/withdrawals/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   adminDeposits: (status = 'all') => adminRequest(`/admin/deposits?status=${status}`),
   reviewDeposit: (id: string, body: { status: string; admin_note?: string }) =>
@@ -149,41 +153,18 @@ export const api = {
   adminCrypto: (status = 'all') => adminRequest(`/admin/crypto?status=${status}`),
   reviewCrypto: (id: string, body: { status: string; admin_note?: string }) =>
     adminRequest(`/admin/crypto/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  adjustCryptoBalance: (id: string, body: { amount: number; reason?: string; transaction_type?: string }) =>
-    adminRequest(`/admin/crypto/${id}/adjust`, { method: 'POST', body: JSON.stringify(body) }),
-
-  getNotifications: (unread = false) => request(`/notifications${unread ? '?unread=true' : ''}`),
-  markNotificationRead: (id: string) =>
-    request(`/notifications/${id}/read`, { method: 'PATCH' }),
-  markAllNotificationsRead: () =>
-    request('/notifications/read-all', { method: 'POST' }),
-
-  setAccountStatus: (id: string, body: { action: string; reason?: string }) =>
-    adminRequest(`/admin/accounts/${id}/status`, { method: 'POST', body: JSON.stringify(body) }),
-  adminAdjustBalance: (id: string, body: { amount: number; reason?: string; description?: string }) =>
-    adminRequest(`/admin/accounts/${id}/adjust`, { method: 'POST', body: JSON.stringify(body) }),
-  adminAddTransaction: (id: string, body: any) =>
-    adminRequest(`/admin/accounts/${id}/transactions`, { method: 'POST', body: JSON.stringify(body) }),
-
-  getAuditLogs: (params?: { target_type?: string; target_id?: string; limit?: number }) => {
-    const q = new URLSearchParams();
-    if (params?.target_type) q.set('target_type', params.target_type);
-    if (params?.target_id) q.set('target_id', params.target_id);
-    if (params?.limit) q.set('limit', String(params.limit));
-    return adminRequest(`/admin/audit-logs?${q.toString()}`);
-  },
 };
 
-export {
-  formatMoney,
-  formatDate,
-  formatShortDate,
-  formatRelativeDay,
-  formatAmountInput,
-  splitMoney,
-  titleCase,
-  maskAccountNumber,
-  maskBalance,
-  BALANCE_MASK,
-  ACCOUNT_MASK,
-} from './format';
+export function formatMoney(amount: number | string, currency = 'USD') {
+  const n = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (!Number.isFinite(n)) return String(amount);
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: currency || 'USD',
+      minimumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return `${n.toLocaleString('en-GB')} ${currency}`;
+  }
+}
