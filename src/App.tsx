@@ -16,6 +16,7 @@ import ProfilePage from './pages/ProfilePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import LegalPage from './pages/LegalPage';
+import { SessionIdle } from './components/SessionIdle';
 
 function SessionLoader() {
   return (
@@ -48,6 +49,8 @@ function AdminLoginGate() {
 
 export default function App() {
   return (
+    <>
+    <SessionIdle />
     <Routes>
       <Route path="/admin/login" element={<AdminLoginGate />} />
       <Route path="/admin/*" element={<AdminProtected><AdminPanel /></AdminProtected>} />
@@ -71,5 +74,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
