@@ -7,14 +7,24 @@ interface User {
   full_name: string;
   role: 'user' | 'admin';
   is_locked?: boolean;
+  phone?: string;
   created_at?: string;
+  last_login?: string;
+}
+
+export interface OtpChallenge {
+  challenge_id: string;
+  email_hint: string;
+  expires_in: number;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, full_name: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<OtpChallenge | null>;
+  verifyOtp: (challengeId: string, code: string) => Promise<void>;
+  resendOtp: (challengeId: string) => Promise<OtpChallenge>;
+  register: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -47,13 +57,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { user, token } = await api.login({ email, password });
+  const login = async (email: string, password: string): Promise<OtpChallenge | null> => {
+    const res: any = await api.login({ email, password });
+    if (res?.requires_otp && res.challenge_id) {
+      return {
+        challenge_id: res.challenge_id,
+        email_hint: res.email_hint || email,
+        expires_in: res.expires_in || 600,
+      };
+    }
+    if (res?.token && res?.user) {
+      localStorage.setItem('rubicon_token', res.token);
+      setUser(res.user);
+      return null;
+    }
+    throw new Error(res?.error || 'Sign in failed');
+  };
+
+  const verifyOtp = async (challengeId: string, code: string) => {
+    const { user, token } = await api.verifyOtp({ challenge_id: challengeId, code });
     localStorage.setItem('rubicon_token', token);
     setUser(user);
   };
 
-  const register = async (email: string, password: string, full_name: string) => {
+  const resendOtp = async (challengeId: string): Promise<OtpChallenge> => {
+    const res: any = await api.resendOtp({ challenge_id: challengeId });
+    return {
+      challenge_id: challengeId,
+      email_hint: res.email_hint || '',
+      expires_in: res.expires_in || 600,
+    };
+  };
+
+  const register = async (email: string, password: string, full_name: string, _phone?: string) => {
     const { user, token } = await api.register({ email, password, full_name });
     localStorage.setItem('rubicon_token', token);
     setUser(user);
@@ -65,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, verifyOtp, resendOtp, register, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );
