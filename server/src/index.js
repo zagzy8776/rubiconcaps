@@ -19,6 +19,8 @@ import notificationRoutes from './routes/notifications.js';
 import adminRoutes from './routes/admin.js';
 import emailOpsRoutes from './routes/emailOps.js';
 import cronRoutes from './routes/cron.js';
+import otpAuthRoutes from './routes/otpAuth.js';
+import withdrawalRoutes from './routes/withdrawals.js';
 import { mountCoreA } from './routes/coreA.js';
 import { mountCoreB } from './routes/coreB.js';
 
@@ -33,6 +35,8 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+app.use(otpAuthRoutes);
+app.use(withdrawalRoutes);
 app.use(depositRoutes);
 app.use(transferRoutes);
 app.use(cryptoRoutes);
@@ -66,31 +70,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-    const { rows } = await query(`SELECT id, email, full_name, role, password_hash, is_locked FROM profiles WHERE email = $1`, [email.toLowerCase()]);
-    if (!rows.length) return res.status(401).json({ error: 'Invalid email or password' });
-    const user = rows[0];
-    if (user.is_locked) return res.status(403).json({ error: 'Account locked. Please contact support.' });
-    const valid = await comparePassword(password, user.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
-    await query('UPDATE profiles SET last_login = now() WHERE id = $1', [user.id]);
-    const token = signToken(user);
-    delete user.password_hash;
-    voidEmail(emailLoginAlert({
-      to: user.email,
-      fullName: user.full_name,
-      when: new Date().toUTCString(),
-      ip: req.ip,
-    }));
-    res.json({ user, token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
+// login handled by otpAuthRoutes (password → email OTP → session)
 
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
@@ -186,7 +166,6 @@ async function runDailyDigest(req, res) {
   }
 }
 
-// Accept GET and POST — cron-job.org and browser tests often use GET
 app.get('/api/cron/daily-digest', authorizeCron, runDailyDigest);
 app.post('/api/cron/daily-digest', authorizeCron, runDailyDigest);
 
