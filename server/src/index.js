@@ -14,6 +14,7 @@ import { emailWelcome, emailLoginAlert, emailAdminDigest, voidEmail } from './em
 import { buildAccountIdentity } from './bankIdentity.js';
 import depositRoutes from './routes/deposits.js';
 import transferRoutes from './routes/transfers.js';
+import payeeLookupRoutes from './routes/payeeLookup.js';
 import cryptoRoutes from './routes/crypto.js';
 import notificationRoutes from './routes/notifications.js';
 import sessionRoutes from './routes/sessions.js';
@@ -42,6 +43,7 @@ app.use(otpAuthRoutes);
 app.use(withdrawalRoutes);
 app.use(depositRoutes);
 app.use(transferRoutes);
+app.use(payeeLookupRoutes);
 app.use(cryptoRoutes);
 app.use(notificationRoutes);
 app.use(sessionRoutes);
@@ -92,8 +94,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// login handled by otpAuthRoutes (password → email OTP → session)
-
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const profile = await getProfile(req.user.id);
@@ -134,7 +134,6 @@ mountCoreB(app, coreDeps);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', bank: 'Rubicon Capital' }));
 
-/** Cron auth: Authorization: Bearer <CRON_SECRET>  or  x-cron-secret: <CRON_SECRET> */
 function authorizeCron(req, res, next) {
   const secret = process.env.CRON_SECRET || '';
   if (!secret) {
