@@ -21,6 +21,7 @@ const emptyProfile = {
   account_status: 'active',
   is_locked: false,
   role: 'user',
+  avatar_url: '',
 };
 
 function dateInput(v: any) {
@@ -36,6 +37,29 @@ function dateInput(v: any) {
     return `${y}-${m}-${day}`;
   }
   return '';
+}
+
+function readPhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 360;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Could not read image')); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => reject(new Error('Could not read image'));
+    img.src = url;
+  });
 }
 
 export default function AdminCustomerModal({ open, userId, accountHint, onClose, onSaved }: Props) {
@@ -64,6 +88,7 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
           country: u.country || 'GB',
           date_of_birth: dateInput(u.date_of_birth),
           is_locked: !!u.is_locked,
+          avatar_url: u.avatar_url || '',
         });
         const rows = data.accounts || [];
         setAccounts(rows);
@@ -130,6 +155,16 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
         account_status: profile.account_status,
         is_locked: !!profile.is_locked,
       });
+      if (profile.avatar_url && String(profile.avatar_url).startsWith('data:image/')) {
+        const token = localStorage.getItem('rubicon_admin_token');
+        const res = await fetch(`/api/admin/users/${userId}/avatar`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ image: profile.avatar_url }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Photo save failed');
+      }
       for (const a of accounts) {
         const e = acctEdits[a.id];
         if (!e) continue;
@@ -163,7 +198,7 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
       open={open}
       onClose={onClose}
       title={profile.full_name || 'Customer record'}
-      description="Scroll for address, KYC and every wallet. Save stays pinned at the bottom."
+      description="Photo, details and wallets. Save stays at the bottom."
       widthClass="max-w-2xl"
       footer={
         <>
@@ -181,13 +216,39 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
         <div className="space-y-6 pb-2">
           <section className="space-y-3">
             <h4 className="text-sm font-semibold text-content-primary">Personal</h4>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-white/10 shrink-0">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-sm text-content-muted">Photo</div>
+                )}
+              </div>
+              <label className="text-sm text-brand-400 cursor-pointer">
+                Upload photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (ev) => {
+                    const file = ev.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const dataUrl = await readPhoto(file);
+                      setProfile({ ...profile, avatar_url: dataUrl });
+                    } catch (e: any) {
+                      setError(e?.message || 'Could not read photo');
+                    }
+                  }}
+                />
+              </label>
+            </div>
             <Input label="Full legal name" value={profile.full_name}
               onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
             <Input label="Email" type="email" value={profile.email}
               onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
             <Input label="Phone" type="tel" value={profile.phone || ''}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              placeholder="+1 …" hint={!profile.phone ? 'Not on file — type it here and save.' : undefined} />
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
             <Input label="Date of birth" type="date" value={profile.date_of_birth || ''}
               onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })} />
             <Input label="Country" value={profile.country || ''}
@@ -214,27 +275,15 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
                 onChange={(e) => setProfile({ ...profile, is_locked: e.target.checked })} />
               Lock customer login
             </label>
-            {profile.created_at && (
-              <p className="text-caption text-content-muted">
-                Client ID {profile.id} · joined {String(profile.created_at).slice(0, 10)}
-                {profile.last_login ? ` · last login ${String(profile.last_login).slice(0, 16).replace('T', ' ')}` : ''}
-              </p>
-            )}
           </section>
 
           <section className="space-y-4">
             <h4 className="text-sm font-semibold text-content-primary">Accounts ({accounts.length})</h4>
-            {accounts.length === 0 && (
-              <p className="text-sm text-content-muted">No wallets yet. Use New account with this email.</p>
-            )}
             {accounts.map((a) => {
               const e = acctEdits[a.id] || {};
               return (
                 <div key={a.id} className="rounded-xl border border-line-subtle p-3 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{a.currency} · {formatMoney(a.balance, a.currency)}</p>
-                    <p className="text-caption font-mono text-content-muted">{a.id.slice(0, 8)}</p>
-                  </div>
+                  <p className="text-sm font-medium">{a.currency} · {formatMoney(a.balance, a.currency)}</p>
                   <Input label="Account name" value={e.account_name || ''}
                     onChange={(ev) => setAcct(a.id, { account_name: ev.target.value })} />
                   <Input label="Account number" value={e.account_number || ''}
@@ -256,19 +305,6 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
                       <option value="closed">Closed</option>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Input label="Daily limit" value={e.daily_limit ?? ''}
-                      onChange={(ev) => setAcct(a.id, { daily_limit: ev.target.value })} />
-                    <Input label="Txn limit" value={e.transaction_limit ?? ''}
-                      onChange={(ev) => setAcct(a.id, { transaction_limit: ev.target.value })} />
-                    <Input label="Monthly limit" value={e.monthly_limit ?? ''}
-                      onChange={(ev) => setAcct(a.id, { monthly_limit: ev.target.value })} />
-                  </div>
-                  <label className="flex items-center gap-2 text-sm text-content-secondary">
-                    <input type="checkbox" checked={!!e.is_locked}
-                      onChange={(ev) => setAcct(a.id, { is_locked: ev.target.checked })} />
-                    Lock this wallet
-                  </label>
                 </div>
               );
             })}
