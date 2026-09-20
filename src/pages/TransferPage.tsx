@@ -15,17 +15,17 @@ import { cx } from '../lib/designTokens';
 const RAILS = {
   ach: {
     label: 'ACH',
-    hint: 'US domestic. Uses routing + account number. Usually 1–2 business days.',
+    hint: 'ACH routing is 9 digits and usually starts with 0, 1 or 2 — e.g. 021, 026, 011, 121.',
     timing: '1–2 business days',
   },
   wire: {
     label: 'Wire transfer',
-    hint: 'Same-day bank wire. Needs routing number and account number.',
+    hint: 'Wire routing is 9 digits (same family as ACH) and usually starts with 0, 1, 2 or 3 — e.g. 021000021.',
     timing: 'Same day if sent before cut-off',
   },
   swift: {
     label: 'SWIFT',
-    hint: 'International. Needs SWIFT/BIC and IBAN or account number.',
+    hint: 'SWIFT/BIC starts with 4 letters (the bank), then the country — e.g. CHASUS33, BARCGB22, DEUTDEFF. IBANs start with a country code like GB, DE, FR.',
     timing: '1–5 business days',
   },
 } as const;
@@ -111,15 +111,14 @@ export default function TransferPage() {
     const ty = String(t.type || '').toLowerCase();
     return ty === 'transfer_in' || ty === 'deposit' || ty === 'credit';
   };
-  const internal = Boolean(payee?.name);
 
   const buildReference = () => {
     const bits = [RAILS[rail].label];
     if (reference.trim()) bits.push(reference.trim());
-    if (!internal && routing) bits.push(`RTN ${routing}`);
-    if (!internal && swiftBic) bits.push(`BIC ${swiftBic}`);
-    if (!internal && iban) bits.push(`IBAN ${iban}`);
-    if (!internal && bankName) bits.push(bankName);
+    if (routing) bits.push(`RTN ${routing}`);
+    if (swiftBic) bits.push(`BIC ${swiftBic}`);
+    if (iban) bits.push(`IBAN ${iban}`);
+    if (bankName) bits.push(bankName);
     return bits.join(' · ');
   };
 
@@ -137,8 +136,7 @@ export default function TransferPage() {
       });
       const money = formatMoney(parseFloat(amount), sel?.currency || 'USD');
       const who = payee?.name ? ` to ${payee.name}` : ` to ${cleaned}`;
-      const when = internal ? 'Posted immediately.' : `Expected ${RAILS[rail].timing.toLowerCase()}.`;
-      setOutcome({ ok: true, title: `${RAILS[rail].label} sent`, detail: `${money} sent${who}. ${when}` });
+      setOutcome({ ok: true, title: `${RAILS[rail].label} sent`, detail: `${money} sent${who}.` });
       setStep('done');
       setToNumber(''); setAmount(''); setReference(''); setTransactionPin('');
       setRouting(''); setSwiftBic(''); setIban(''); setBankName('');
@@ -157,12 +155,6 @@ export default function TransferPage() {
     if (!fromAccount) return setFormError('Select an account');
     if (!toNumber.trim()) return setFormError('Enter the recipient account number');
     if (!amount || parseFloat(amount) <= 0) return setFormError('Enter a valid amount');
-    if (!internal && (rail === 'ach' || rail === 'wire') && routing.replace(/\D/g, '').length !== 9) {
-      return setFormError('Enter the 9-digit routing number');
-    }
-    if (!internal && rail === 'swift' && swiftBic.replace(/\s+/g, '').length < 8) {
-      return setFormError('Enter the SWIFT / BIC code');
-    }
     setFormError('');
     setStep('review');
   };
@@ -227,11 +219,10 @@ export default function TransferPage() {
                   <p><span className="text-content-muted">Method </span>{RAILS[rail].label}</p>
                   <p><span className="text-content-muted">From </span>{sel ? `${sel.account_name || sel.currency} · ${maskAccountNumber(sel.account_number)}` : '—'}</p>
                   <p><span className="text-content-muted">To </span>{payee?.name ? `${payee.name} · ` : ''}{toNumber}</p>
-                  {!internal && routing && <p><span className="text-content-muted">Routing </span>{routing}</p>}
-                  {!internal && swiftBic && <p><span className="text-content-muted">SWIFT </span>{swiftBic}</p>}
-                  {!internal && iban && <p><span className="text-content-muted">IBAN </span>{iban}</p>}
+                  {routing && <p><span className="text-content-muted">Routing </span>{routing}</p>}
+                  {swiftBic && <p><span className="text-content-muted">SWIFT </span>{swiftBic}</p>}
+                  {iban && <p><span className="text-content-muted">IBAN </span>{iban}</p>}
                   <p className="font-semibold">{formatMoney(parseFloat(amount) || 0, sel?.currency || 'USD')}</p>
-                  <p className="text-caption text-content-muted">{internal ? 'On-platform — posts immediately.' : RAILS[rail].hint}</p>
                 </div>
               ) : (
                 <>
@@ -250,34 +241,36 @@ export default function TransferPage() {
                     label={rail === 'swift' ? 'Account number or IBAN' : 'Recipient account number'}
                     value={toNumber}
                     onChange={(e) => setToNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ''))}
-                    placeholder={rail === 'swift' ? 'IBAN or account number' : '12-digit number'}
+                    placeholder={rail === 'swift' ? 'Starts with GB, DE, FR… or digits' : 'Account number'}
                     hint={payee?.name || payeeHint || undefined}
                   />
-                  {!internal && (rail === 'ach' || rail === 'wire') && (
+                  {(rail === 'ach' || rail === 'wire') && (
                     <Input
-                      label="Routing number"
+                      label={rail === 'ach' ? 'ACH routing number' : 'Wire routing number'}
                       value={routing}
                       onChange={(e) => setRouting(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                      placeholder="9 digits"
+                      placeholder={rail === 'ach' ? 'Starts with 0, 1 or 2 — 9 digits' : 'Starts with 0–3 — 9 digits'}
+                      hint={RAILS[rail].hint}
                       inputMode="numeric"
                     />
                   )}
-                  {!internal && rail === 'wire' && (
+                  {rail === 'wire' && (
                     <Input label="Bank name (optional)" value={bankName} onChange={(e) => setBankName(e.target.value)} />
                   )}
-                  {!internal && rail === 'swift' && (
+                  {rail === 'swift' && (
                     <>
                       <Input
                         label="SWIFT / BIC"
                         value={swiftBic}
                         onChange={(e) => setSwiftBic(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 11))}
-                        placeholder="e.g. CHASUS33"
+                        placeholder="Starts with 4 letters — CHASUS33"
+                        hint={RAILS.swift.hint}
                       />
                       <Input
-                        label="IBAN (if different)"
+                        label="IBAN"
                         value={iban}
                         onChange={(e) => setIban(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                        placeholder="Optional if account number already entered"
+                        placeholder="Starts with country code — GB, DE, FR"
                       />
                       <Input label="Bank name (optional)" value={bankName} onChange={(e) => setBankName(e.target.value)} />
                     </>
