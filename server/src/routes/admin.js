@@ -271,19 +271,39 @@ router.get('/api/admin/audit-logs', authMiddleware, adminMiddleware, async (req,
   }
 });
 
+router.get('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, email, full_name, phone, address, country, date_of_birth, role,
+              is_locked, kyc_status, account_status, created_at, last_login
+       FROM profiles WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+    const accts = await query(`SELECT * FROM accounts WHERE user_id = $1 ORDER BY created_at`, [req.params.id]);
+    res.json({ user: rows[0], accounts: accts.rows });
+  } catch (err) {
+    console.error('admin user get:', err);
+    res.status(500).json({ error: err.message || 'Failed to load user' });
+  }
+});
 
-// Admin: edit customer profile fields
 router.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const body = req.body || {};
-    const allowed = ['full_name', 'email', 'phone', 'address', 'country', 'date_of_birth'];
+    const allowed = ['full_name', 'email', 'phone', 'address', 'country', 'date_of_birth', 'kyc_status', 'account_status'];
     const sets = [];
     const vals = [];
     let i = 1;
     for (const f of allowed) {
-      if (body[f] !== undefined && body[f] !== null) {
+      if (body[f] !== undefined && body[f] !== null && body[f] !== '') {
         sets.push(`${f} = $${i++}`);
         vals.push(typeof body[f] === 'string' ? body[f].trim() : body[f]);
+      } else if (body[f] === null || body[f] === '') {
+        if (f === 'date_of_birth' || f === 'phone' || f === 'address') {
+          sets.push(`${f} = $${i++}`);
+          vals.push(null);
+        }
       }
     }
     if (body.is_locked !== undefined) {
@@ -294,7 +314,7 @@ router.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req
     vals.push(req.params.id);
     const { rows } = await query(
       `UPDATE profiles SET ${sets.join(', ')} WHERE id = $${i}
-       RETURNING id, email, full_name, phone, address, country, date_of_birth, is_locked, role, created_at`,
+       RETURNING id, email, full_name, phone, address, country, date_of_birth, is_locked, role, kyc_status, account_status, created_at`,
       vals
     );
     if (!rows[0]) return res.status(404).json({ error: 'User not found' });
@@ -306,24 +326,26 @@ router.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// Admin: edit account fields (name, type, status)
 router.patch('/api/admin/accounts/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const body = req.body || {};
     const sets = [];
     const vals = [];
     let i = 1;
-    if (body.account_name !== undefined) {
-      sets.push(`account_name = $${i++}`);
-      vals.push(String(body.account_name).trim());
+    const strings = ['account_name', 'account_type', 'status', 'account_number', 'routing_number'];
+    for (const f of strings) {
+      if (body[f] !== undefined && body[f] !== null) {
+        sets.push(`${f} = $${i++}`);
+        vals.push(String(body[f]).trim());
+      }
     }
-    if (body.account_type !== undefined) {
-      sets.push(`account_type = $${i++}`);
-      vals.push(String(body.account_type).trim());
-    }
-    if (body.status !== undefined) {
-      sets.push(`status = $${i++}`);
-      vals.push(String(body.status).trim());
+    for (const f of ['daily_limit', 'transaction_limit', 'monthly_limit']) {
+      if (body[f] !== undefined && body[f] !== null && body[f] !== '') {
+        const n = parseFloat(body[f]);
+        if (!Number.isFinite(n)) return res.status(400).json({ error: `Invalid ${f}` });
+        sets.push(`${f} = $${i++}`);
+        vals.push(n);
+      }
     }
     if (body.is_locked !== undefined) {
       sets.push(`is_locked = $${i++}`);
@@ -343,6 +365,5 @@ router.patch('/api/admin/accounts/:id', authMiddleware, adminMiddleware, async (
     res.status(500).json({ error: err.message || 'Failed to update account' });
   }
 });
-
 
 export default router;
