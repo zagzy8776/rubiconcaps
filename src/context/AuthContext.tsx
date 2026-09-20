@@ -21,10 +21,15 @@ export interface OtpChallenge {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<OtpChallenge | null>;
+  login: (email: string, password: string, opts?: { trust_device?: boolean }) => Promise<OtpChallenge | null>;
   verifyOtp: (challengeId: string, code: string) => Promise<void>;
   resendOtp: (challengeId: string) => Promise<OtpChallenge>;
-  register: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    full_name: string,
+    profile?: { phone?: string; date_of_birth?: string; address?: string; country?: string },
+  ) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -57,8 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh();
   }, []);
 
-  const login = async (email: string, password: string): Promise<OtpChallenge | null> => {
-    const res: any = await api.login({ email, password });
+  const login = async (email: string, password: string, opts?: { trust_device?: boolean }): Promise<OtpChallenge | null> => {
+    const res: any = await api.login({ email, password, trust_device: opts?.trust_device });
     if (res?.requires_otp && res.challenge_id) {
       return {
         challenge_id: res.challenge_id,
@@ -89,8 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  const register = async (email: string, password: string, full_name: string, _phone?: string) => {
-    const { user, token } = await api.register({ email, password, full_name });
+  const register = async (
+    email: string,
+    password: string,
+    full_name: string,
+    profile?: { phone?: string; date_of_birth?: string; address?: string; country?: string },
+  ) => {
+    const { user, token } = await api.register({ email, password, full_name, ...profile });
     localStorage.setItem('rubicon_token', token);
     setUser(user);
   };
