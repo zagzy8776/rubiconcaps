@@ -112,8 +112,8 @@ export default function TransferPage() {
     return ty === 'transfer_in' || ty === 'deposit' || ty === 'credit';
   };
 
-  const buildReference = () => {
-    const bits = [RAILS[rail].label];
+  const buildReference = (): string => {
+    const bits: string[] = [RAILS[rail].label];
     if (reference.trim()) bits.push(reference.trim());
     if (routing) bits.push(`RTN ${routing}`);
     if (swiftBic) bits.push(`BIC ${swiftBic}`);
