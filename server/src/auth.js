@@ -66,7 +66,6 @@ export async function authMiddleware(req, res, next) {
   try {
     const payload = verifyToken(header.slice(7));
 
-    // Owner console token is not a customer session — skip profile/session checks.
     if (payload.id !== 'admin-owner') {
       if (payload.sv != null && payload.id) {
         try {
@@ -121,13 +120,25 @@ export function adminMiddleware(req, res, next) {
 }
 
 export async function getProfile(userId) {
-  const { rows } = await query(
-    `SELECT id, email, full_name, role, is_locked, phone, address, country, date_of_birth,
-            kyc_status, account_status, created_at, last_login,
-            notify_login, notify_transfers, notify_deposits, notify_marketing,
-            COALESCE(session_version, 1) AS session_version
-     FROM profiles WHERE id = $1`,
-    [userId]
-  );
-  return rows[0] || null;
+  try {
+    const { rows } = await query(
+      `SELECT id, email, full_name, role, is_locked, phone, address, country, date_of_birth,
+              kyc_status, account_status, created_at, last_login, avatar_url,
+              notify_login, notify_transfers, notify_deposits, notify_marketing,
+              COALESCE(session_version, 1) AS session_version
+       FROM profiles WHERE id = $1`,
+      [userId]
+    );
+    return rows[0] || null;
+  } catch {
+    const { rows } = await query(
+      `SELECT id, email, full_name, role, is_locked, phone, address, country, date_of_birth,
+              kyc_status, account_status, created_at, last_login,
+              notify_login, notify_transfers, notify_deposits, notify_marketing,
+              COALESCE(session_version, 1) AS session_version
+       FROM profiles WHERE id = $1`,
+      [userId]
+    );
+    return rows[0] || null;
+  }
 }
