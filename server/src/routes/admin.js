@@ -129,7 +129,7 @@ router.post('/api/admin/accounts/:id/adjust', authMiddleware, adminMiddleware, a
       });
 
       const txType = amt > 0 ? 'deposit' : 'withdrawal';
-      const desc = description || reason || `Admin ${amt > 0 ? 'credit' : 'debit'}`;
+      const desc = description || reason || (amt > 0 ? 'Deposit credited' : 'Withdrawal completed');
       const ref = `ADJ-${Date.now().toString(36).toUpperCase()}`;
 
       const attempt1 = await tryInSavepoint(client, 'sp_tx1', async () => {
@@ -270,5 +270,79 @@ router.get('/api/admin/audit-logs', authMiddleware, adminMiddleware, async (req,
     res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
+
+
+// Admin: edit customer profile fields
+router.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const allowed = ['full_name', 'email', 'phone', 'address', 'country', 'date_of_birth'];
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    for (const f of allowed) {
+      if (body[f] !== undefined && body[f] !== null) {
+        sets.push(`${f} = $${i++}`);
+        vals.push(typeof body[f] === 'string' ? body[f].trim() : body[f]);
+      }
+    }
+    if (body.is_locked !== undefined) {
+      sets.push(`is_locked = $${i++}`);
+      vals.push(!!body.is_locked);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    vals.push(req.params.id);
+    const { rows } = await query(
+      `UPDATE profiles SET ${sets.join(', ')} WHERE id = $${i}
+       RETURNING id, email, full_name, phone, address, country, date_of_birth, is_locked, role, created_at`,
+      vals
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+    await createAuditLog(req.user.id, 'user_edit', 'profile', req.params.id, null, rows[0], body.reason || 'Admin profile edit', req.ip);
+    res.json({ success: true, user: rows[0] });
+  } catch (err) {
+    console.error('admin user edit:', err);
+    res.status(500).json({ error: err.message || 'Failed to update user' });
+  }
+});
+
+// Admin: edit account fields (name, type, status)
+router.patch('/api/admin/accounts/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    if (body.account_name !== undefined) {
+      sets.push(`account_name = $${i++}`);
+      vals.push(String(body.account_name).trim());
+    }
+    if (body.account_type !== undefined) {
+      sets.push(`account_type = $${i++}`);
+      vals.push(String(body.account_type).trim());
+    }
+    if (body.status !== undefined) {
+      sets.push(`status = $${i++}`);
+      vals.push(String(body.status).trim());
+    }
+    if (body.is_locked !== undefined) {
+      sets.push(`is_locked = $${i++}`);
+      vals.push(!!body.is_locked);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    vals.push(req.params.id);
+    const { rows } = await query(
+      `UPDATE accounts SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+      vals
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Account not found' });
+    await createAuditLog(req.user.id, 'account_edit', 'account', req.params.id, null, rows[0], body.reason || 'Admin account edit', req.ip);
+    res.json({ success: true, account: rows[0] });
+  } catch (err) {
+    console.error('admin account edit:', err);
+    res.status(500).json({ error: err.message || 'Failed to update account' });
+  }
+});
+
 
 export default router;

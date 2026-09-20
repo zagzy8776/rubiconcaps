@@ -74,6 +74,8 @@ export default function TransferPage() {
   const [toNumber, setToNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
+  const [transactionPin, setTransactionPin] = useState('');
+  const [hasPin, setHasPin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState('');
@@ -97,6 +99,11 @@ export default function TransferPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  
+  useEffect(() => {
+    api.getPinStatus().then((r: any) => setHasPin(!!r.has_pin)).catch(() => setHasPin(false));
   }, []);
 
   useEffect(() => {
@@ -188,6 +195,7 @@ export default function TransferPage() {
         to_account_number: cleaned,
         amount: parseFloat(amount),
         reference: reference.trim() || undefined,
+        transaction_pin: transactionPin || undefined,
       });
       setSuccess(
         `Transfer of ${formatMoney(parseFloat(amount), sel?.currency || primaryCurrency)} to ${cleaned} was successful!`,
@@ -196,6 +204,7 @@ export default function TransferPage() {
       setToNumber('');
       setAmount('');
       setReference('');
+      setTransactionPin('');
       await load();
     } catch (e: any) {
       setFormError(e?.message || 'Transfer failed');
@@ -579,6 +588,26 @@ export default function TransferPage() {
               </>
             )}
           </div>
+
+            {hasPin && modalStep === 'review' && (
+              <Input
+                label="Transaction PIN"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                value={transactionPin}
+                onChange={(e) => setTransactionPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="4–6 digit PIN"
+                required
+                hint="Required to authorise this transfer"
+              />
+            )}
+            {!hasPin && modalStep === 'review' && (
+              <p className="text-caption text-content-muted">
+                Tip: set a transaction PIN in Profile for extra protection on transfers.
+              </p>
+            )}
+
           <div className="mt-6 flex gap-3">
             {modalStep === 'review' ? (
               <>

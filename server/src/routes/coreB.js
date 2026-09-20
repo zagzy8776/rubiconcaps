@@ -146,13 +146,13 @@ app.post('/api/admin/accounts', authMiddleware, adminMiddleware, async (req, res
         try {
           await client.query(
             `INSERT INTO transactions (account_id, user_id, type, amount, currency, status, description, reference)
-             VALUES ($1, $2, 'deposit', $3, $4, 'completed', 'Initial deposit by admin', $5)`,
+             VALUES ($1, $2, 'deposit', $3, $4, 'completed', 'Opening balance', $5)`,
             [account.id, user_id, deposit, currency, 'ADM-' + Math.random().toString(36).slice(2, 8).toUpperCase()]
           );
         } catch (_) {
           await client.query(
             `INSERT INTO transactions (account_id, type, amount, currency, status, description, reference)
-             VALUES ($1, 'deposit', $2, $3, 'completed', 'Initial deposit by admin', $4)`,
+             VALUES ($1, 'deposit', $2, $3, 'completed', 'Opening balance', $4)`,
             [account.id, deposit, currency, 'ADM-' + Math.random().toString(36).slice(2, 8).toUpperCase()]
           );
         }

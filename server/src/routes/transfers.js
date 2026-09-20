@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { query, withTransaction } from '../db.js';
 import { authMiddleware } from '../auth.js';
 import { createNotification } from '../helpers.js';
+import { assertTransactionPin } from './pin.js';
 import {
   getUserContact,
   emailTransferSent,
@@ -68,6 +69,11 @@ async function insertLedger(client, spPrefix, {
 router.post('/api/transfers', authMiddleware, async (req, res) => {
   try {
     const { from_account_id, to_account_number, amount, reference } = req.body || {};
+
+    const pinCheck = await assertTransactionPin(req.user.id, req.body?.transaction_pin ?? req.body?.pin);
+    if (!pinCheck.ok) {
+      return res.status(401).json({ error: pinCheck.error, pin_required: true });
+    }
     if (!from_account_id || !to_account_number || amount === undefined) {
       return res.status(400).json({ error: 'Sender account, recipient account number, and amount are required' });
     }

@@ -87,6 +87,35 @@ export default function AdminPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
+  
+  const handleUserEdit = async (u: any) => {
+    const name = prompt('Full name', u.full_name || '');
+    if (name === null) return;
+    const phone = prompt('Phone', u.phone || '');
+    if (phone === null) return;
+    setBusy(true); setActionError('');
+    try {
+      await api.adminUpdateUser(u.id, { full_name: name, phone });
+      setNotice('Customer updated.');
+      await loadTab('users');
+    } catch (e: any) {
+      setActionError(e?.message || 'Update failed');
+    } finally { setBusy(false); }
+  };
+
+  const handleAccountEdit = async (a: any) => {
+    const name = prompt('Account name', a.account_name || '');
+    if (name === null) return;
+    setBusy(true); setActionError('');
+    try {
+      await api.adminUpdateAccount(a.id, { account_name: name });
+      setNotice('Account updated.');
+      await loadTab('accounts');
+    } catch (e: any) {
+      setActionError(e?.message || 'Update failed');
+    } finally { setBusy(false); }
+  };
+
   const toggleUserLock = async (id: string, locked: boolean) => {
     setBusy(true); setActionError('');
     try {
@@ -287,6 +316,8 @@ export default function AdminPanel() {
             auditLogs={auditLogs}
             activity={activity}
             toggleUserLock={toggleUserLock}
+            handleUserEdit={handleUserEdit}
+            handleAccountEdit={handleAccountEdit}
             handleAccountStatus={handleAccountStatus}
             handleDepositReview={handleDepositReview}
             handleWithdrawalReview={handleWithdrawalReview}
@@ -328,7 +359,7 @@ export default function AdminPanel() {
         </div>
       </Modal>
 
-      <Modal open={showAdjust} onClose={() => setShowAdjust(false)} title={`${adjustType === 'credit' ? 'Credit' : 'Debit'} account`}>
+      <Modal open={showAdjust} onClose={() => setShowAdjust(false)} title={`${adjustType === 'credit' ? 'Credit deposit' : 'Debit'} account`}>
         <div className="space-y-4">
           <Input label="Amount" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} />
           <Input label="Reason" value={adjustReason} onChange={e => setAdjustReason(e.target.value)} />

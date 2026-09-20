@@ -166,13 +166,13 @@ router.patch('/api/admin/deposits/:id', authMiddleware, adminMiddleware, async (
         try {
           await client.query(
             `INSERT INTO transactions (account_id, user_id, type, amount, currency, description, reference, status)
-             VALUES ($1, $2, 'deposit', $3, $4, 'Admin-approved deposit', $5, 'completed')`,
+             VALUES ($1, $2, 'deposit', $3, $4, 'Deposit credited', $5, 'completed')`,
             [dep.account_id, dep.customer_id, amt, dep.currency, `DEP-${String(dep.id).slice(0, 8)}`]
           );
         } catch (_) {
           await client.query(
             `INSERT INTO transactions (account_id, user_id, type, amount, currency, description, reference)
-             VALUES ($1, $2, 'deposit', $3, $4, 'Admin-approved deposit', $5)`,
+             VALUES ($1, $2, 'deposit', $3, $4, 'Deposit credited', $5)`,
             [dep.account_id, dep.customer_id, amt, dep.currency, `DEP-${String(dep.id).slice(0, 8)}`]
           );
         }

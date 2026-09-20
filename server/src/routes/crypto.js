@@ -12,7 +12,16 @@ const router = Router();
 const SUPPORTED_ASSETS = ['BTC', 'ETH', 'USDT', 'USDC'];
 
 function generateWalletAddress(asset) {
-  return `sim_${asset.toLowerCase()}_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+  const hex = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '');
+  const a = String(asset || '').toUpperCase();
+  if (a === 'BTC') {
+    // Bech32-style simulated address (demo only)
+    return 'bc1q' + hex.slice(0, 38);
+  }
+  if (a === 'ETH' || a === 'USDT' || a === 'USDC') {
+    return '0x' + hex.slice(0, 40);
+  }
+  return 'rb1' + hex.slice(0, 38);
 }
 
 router.post('/api/crypto', authMiddleware, async (req, res) => {
@@ -135,9 +144,9 @@ router.post('/api/admin/crypto/:id/adjust', authMiddleware, adminMiddleware, asy
       await client.query(
         `INSERT INTO crypto_transactions (crypto_account_id, transaction_type, amount, asset, reference, status)
          VALUES ($1, $2, $3, $4, $5, 'completed')`,
-        [req.params.id, txType, amt, crypto.asset, reason || 'Admin adjustment']
+        [req.params.id, txType, amt, crypto.asset, reason || (amt > 0 ? 'Crypto deposit credited' : 'Crypto withdrawal completed')]
       );
-      await createNotification(crypto.customer_id, 'crypto_adjustment', 'Crypto balance adjusted',
+      await createNotification(crypto.customer_id, 'crypto_adjustment', amt > 0 ? 'Crypto deposit credited' : 'Crypto balance updated',
         `Your ${crypto.asset} balance adjusted by ${amt > 0 ? '+' : ''}${amt.toFixed(8)} ${crypto.asset}.`,
         { crypto_account_id: crypto.id, amount: amt });
       await createAuditLog(req.user.id, 'crypto_adjust', 'crypto_account', crypto.id,
@@ -147,7 +156,7 @@ router.post('/api/admin/crypto/:id/adjust', authMiddleware, adminMiddleware, asy
         const contact = await getUserContact(crypto.customer_id);
         if (!contact?.email) return;
         const html = layout({
-          title: 'Crypto balance adjusted',
+          title: amt > 0 ? 'Crypto deposit credited' : 'Crypto balance updated',
           preheader: `${crypto.asset} balance updated.`,
           bodyHtml: `<p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#f8fafc;">${amt > 0 ? '+' : ''}${amt} ${escapeHtml(crypto.asset)}</p>
             <table role="presentation" width="100%">${row('New balance', escapeHtml(String(newBal)))}${row('Asset', escapeHtml(crypto.asset))}</table>`,
@@ -159,6 +168,111 @@ router.post('/api/admin/crypto/:id/adjust', authMiddleware, adminMiddleware, asy
     });
     res.json({ success: true, ...result });
   } catch (err) { res.status(400).json({ error: err.message || 'Adjustment failed' }); }
+});
+
+
+// Customer: request a crypto deposit (admin credits after confirmation)
+router.post('/api/crypto/:id/deposit-request', authMiddleware, async (req, res) => {
+  try {
+    const amt = parseFloat(req.body?.amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ error: 'Valid amount required' });
+    }
+    const { rows: accts } = await query(
+      `SELECT * FROM crypto_accounts WHERE id = $1 AND customer_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!accts[0]) return res.status(404).json({ error: 'Crypto account not found' });
+    if (accts[0].status !== 'active') {
+      return res.status(400).json({ error: 'Crypto account must be active before depositing' });
+    }
+    // Store as pending row in crypto_transactions
+    const ref = (req.body?.reference && String(req.body.reference).trim()) || `CDEP-${Date.now().toString(36).toUpperCase()}`;
+    const { rows } = await query(
+      `INSERT INTO crypto_transactions (crypto_account_id, transaction_type, amount, asset, reference, status)
+       VALUES ($1, 'deposit', $2, $3, $4, 'pending') RETURNING *`,
+      [accts[0].id, amt, accts[0].asset, ref]
+    );
+    await createNotification(
+      req.user.id,
+      'crypto_deposit_requested',
+      'Crypto deposit requested',
+      `Your ${accts[0].asset} deposit of ${amt} is pending review.`
+    ).catch(() => {});
+    res.status(201).json({ deposit_request: rows[0] });
+  } catch (err) {
+    console.error('crypto deposit request:', err);
+    res.status(500).json({ error: 'Failed to request crypto deposit' });
+  }
+});
+
+// Admin: list pending crypto deposit txs
+router.get('/api/admin/crypto-deposits', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT ct.*, ca.asset AS account_asset, ca.wallet_address, p.full_name, p.email
+       FROM crypto_transactions ct
+       JOIN crypto_accounts ca ON ca.id = ct.crypto_account_id
+       LEFT JOIN profiles p ON p.id = ca.customer_id
+       WHERE ct.status = 'pending' AND ct.transaction_type = 'deposit'
+       ORDER BY ct.created_at DESC LIMIT 100`
+    ).catch(() => ({ rows: [] }));
+    res.json({ deposits: rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list crypto deposits' });
+  }
+});
+
+// Admin: approve/reject crypto deposit request
+router.patch('/api/admin/crypto-deposits/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status, admin_note } = req.body || {};
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be approved or rejected' });
+    }
+    const result = await withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM crypto_transactions WHERE id = $1 FOR UPDATE`,
+        [req.params.id]
+      );
+      const tx = rows[0];
+      if (!tx) throw new Error('Request not found');
+      if (tx.status !== 'pending') throw new Error('Already reviewed');
+
+      await client.query(
+        `UPDATE crypto_transactions SET status = $1 WHERE id = $2`,
+        [status === 'approved' ? 'completed' : 'rejected', req.params.id]
+      ).catch(async () => {
+        await client.query(`UPDATE crypto_transactions SET status = $1 WHERE id = $2`, [status, req.params.id]);
+      });
+
+      if (status === 'approved') {
+        const amt = parseFloat(tx.amount);
+        await client.query(
+          `UPDATE crypto_accounts SET balance = balance + $1, status = 'active' WHERE id = $2`,
+          [amt, tx.crypto_account_id]
+        );
+      }
+      return tx;
+    });
+
+    const { rows: ca } = await query(`SELECT * FROM crypto_accounts WHERE id = $1`, [result.crypto_account_id]);
+    const customerId = ca[0]?.customer_id;
+    if (customerId) {
+      await createNotification(
+        customerId,
+        status === 'approved' ? 'crypto_deposit_credited' : 'crypto_deposit_rejected',
+        status === 'approved' ? 'Crypto deposit credited' : 'Crypto deposit not approved',
+        status === 'approved'
+          ? `Your ${result.asset || ca[0]?.asset} deposit of ${result.amount} was credited.`
+          : (admin_note || 'Your crypto deposit request was not approved.')
+      ).catch(() => {});
+    }
+    res.json({ success: true, status });
+  } catch (err) {
+    console.error('crypto deposit review:', err);
+    res.status(400).json({ error: err.message || 'Review failed' });
+  }
 });
 
 export default router;

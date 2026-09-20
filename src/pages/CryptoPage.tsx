@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { formatRelativeDay } from '../lib/format';
-import { Alert, Button, Card, EmptyState, Modal, PageHeader, Select, SectionHeading, Skeleton, SkeletonCard, StatusBadge } from '../components/ui';
+import { Alert, Button, Card, EmptyState, Input, Modal, PageHeader, Select, SectionHeading, Skeleton, SkeletonCard, StatusBadge } from '../components/ui';
 import { Check, Coins, Copy, ExternalLink, Plus } from 'lucide-react';
 import { cx } from '../lib/designTokens';
 
@@ -27,6 +27,9 @@ export default function CryptoPage() {
   const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [depositAccountId, setDepositAccountId] = useState<string | null>(null);
+  const [depositAmount, setDepositAmount] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -44,6 +47,36 @@ export default function CryptoPage() {
 
   const copyAddress = async (addr: string, id: string) => {
     try { await navigator.clipboard.writeText(addr); setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); } catch {}
+  };
+
+
+  const openDeposit = (id: string) => {
+    setDepositAccountId(id);
+    setDepositAmount('');
+    setFormError('');
+    setShowDeposit(true);
+  };
+
+  const handleCryptoDeposit = async () => {
+    setFormError('');
+    const amt = parseFloat(depositAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setFormError('Enter a valid amount');
+      return;
+    }
+    if (!depositAccountId) return;
+    setBusy(true);
+    try {
+      await api.requestCryptoDeposit(depositAccountId, { amount: amt });
+      setShowDeposit(false);
+      setSuccess('Crypto deposit requested. You will be notified when it is credited.');
+      setTimeout(() => setSuccess(''), 4000);
+      if (selectedId === depositAccountId) await loadTx(depositAccountId);
+    } catch (e: any) {
+      setFormError(e?.message || 'Request failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleRequest = async () => {
@@ -119,6 +152,13 @@ export default function CryptoPage() {
                       <p className="text-micro text-content-muted">{ca.asset}</p>
                     </div>
                   </div>
+                  {ca.status === 'active' && (
+                    <div className="mt-3 pt-3 border-t border-line-subtle flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="secondary" onClick={() => openDeposit(ca.id)}>
+                        Request deposit
+                      </Button>
+                    </div>
+                  )}
                 </Card>
               );
             })}
@@ -171,6 +211,30 @@ export default function CryptoPage() {
           <div className="mt-6 flex gap-3">
             <Button variant="secondary" onClick={() => setShowRequest(false)}>Cancel</Button>
             <Button onClick={handleRequest} loading={busy} loadingLabel="Requesting…" fullWidth>Request Account</Button>
+          </div>
+        </Modal>
+
+        <Modal open={showDeposit} onClose={() => { setShowDeposit(false); setFormError(''); }}
+          title="Request crypto deposit" description="Submit an amount to credit after review. Send only to your Rubicon wallet address.">
+          <div className="space-y-4">
+            {formError && <Alert tone="error">{formError}</Alert>}
+            <Input
+              label="Amount"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              placeholder="0.00"
+            />
+            <p className="text-caption text-content-muted">
+              After you request a deposit, our team credits the balance once funds are confirmed. This is not an on-chain broadcast from the app.
+            </p>
+          </div>
+          <div className="mt-6 flex gap-3">
+            <Button variant="secondary" onClick={() => setShowDeposit(false)}>Cancel</Button>
+            <Button onClick={handleCryptoDeposit} loading={busy} loadingLabel="Submitting…" fullWidth>Submit request</Button>
           </div>
         </Modal>
       </main>

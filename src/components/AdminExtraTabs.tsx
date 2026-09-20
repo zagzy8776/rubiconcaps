@@ -17,6 +17,8 @@ type Props = {
   auditLogs: any[];
   activity: any[];
   toggleUserLock: (id: string, locked: boolean) => void;
+  handleUserEdit?: (u: any) => void;
+  handleAccountEdit?: (a: any) => void;
   handleAccountStatus: (id: string, action: string) => void;
   handleDepositReview: (id: string, status: 'approved' | 'rejected') => void;
   handleWithdrawalReview: (id: string, status: 'approved' | 'rejected') => void;
@@ -30,7 +32,7 @@ type Props = {
 export function AdminExtraTabs(p: Props) {
   const {
     tab, users, accounts, depositRequests, withdrawalRequests, cryptoAccounts, auditLogs, activity,
-    toggleUserLock, handleAccountStatus, handleDepositReview, handleWithdrawalReview, handleCryptoReview,
+    toggleUserLock, handleUserEdit, handleAccountEdit, handleAccountStatus, handleDepositReview, handleWithdrawalReview, handleCryptoReview,
     handleCryptoAdjust, openCredit, openDebit, openCreate,
   } = p;
 
@@ -50,6 +52,9 @@ export function AdminExtraTabs(p: Props) {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {u.is_locked ? <Badge tone="negative">Locked</Badge> : <Badge tone="positive">Active</Badge>}
+                  {handleUserEdit && (
+                    <Button size="sm" variant="secondary" onClick={() => handleUserEdit(u)}>Edit</Button>
+                  )}
                   <Button size="sm" variant="secondary" onClick={() => toggleUserLock(u.id, u.is_locked)}>
                     {u.is_locked ? 'Unlock' : 'Lock'}
                   </Button>
@@ -76,7 +81,7 @@ export function AdminExtraTabs(p: Props) {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{a.full_name || a.email} · {a.currency}</p>
-                    <p className="text-caption text-content-muted font-mono">{maskAccountNumber(a.account_number)}</p>
+                    <p className="text-caption text-content-muted font-mono">{a.account_number || maskAccountNumber(a.account_number)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold tabular-nums">{formatMoney(a.balance, a.currency)}</p>
@@ -84,8 +89,11 @@ export function AdminExtraTabs(p: Props) {
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="success" onClick={() => openCredit(a)}>+ Credit</Button>
-                  <Button size="sm" variant="danger" onClick={() => openDebit(a)}>− Debit</Button>
+                  <Button size="sm" variant="success" onClick={() => openCredit(a)}>Credit deposit</Button>
+                  <Button size="sm" variant="danger" onClick={() => openDebit(a)}>Debit</Button>
+                  {handleAccountEdit && (
+                    <Button size="sm" variant="secondary" onClick={() => handleAccountEdit(a)}>Edit</Button>
+                  )}
                   <Button size="sm" variant="secondary" onClick={() => handleAccountStatus(a.id, a.is_locked ? 'unlock' : 'lock')}>
                     {a.is_locked ? 'Unlock' : 'Lock'}
                   </Button>
@@ -191,9 +199,11 @@ export function AdminExtraTabs(p: Props) {
                   {ca.status === 'active' && (
                     <>
                       <Button size="sm" variant="secondary" onClick={() => {
-                        const amt = prompt(`Credit ${ca.asset} amount`);
-                        if (amt) handleCryptoAdjust(ca.id, parseFloat(amt));
-                      }}>+ Balance</Button>
+                        const amt = prompt(`Credit ${ca.asset} deposit amount`);
+                        if (amt && Number.isFinite(parseFloat(amt))) {
+                          handleCryptoAdjust(ca.id, parseFloat(amt), 'Crypto deposit credited');
+                        }
+                      }}>Credit deposit</Button>
                       <Button size="sm" variant="secondary" onClick={() => handleCryptoReview(ca.id, 'suspended')}>Suspend</Button>
                     </>
                   )}

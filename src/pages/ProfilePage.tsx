@@ -37,6 +37,11 @@ export default function ProfilePage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [hasPin, setHasPin] = useState(false);
+  const [pinValue, setPinValue] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [editField, setEditField] = useState('');
   const [editValue, setEditValue] = useState('');
   const [editLabel, setEditLabel] = useState('');
@@ -70,6 +75,7 @@ export default function ProfilePage() {
         if (typeof p.notify_deposits === 'boolean') setNotifDeposits(p.notify_deposits);
       })
       .catch(() => {});
+    api.getPinStatus().then((r: any) => setHasPin(!!r.has_pin)).catch(() => {});
   }, []);
 
   const savePref = async (key: string, value: boolean) => {
@@ -186,6 +192,34 @@ export default function ProfilePage() {
     }
   };
 
+
+  const handleSetPin = async () => {
+    setError('');
+    if (!/^\d{4,6}$/.test(pinValue)) {
+      setError('PIN must be 4–6 digits');
+      return;
+    }
+    if (pinValue !== confirmPin) {
+      setError('PINs do not match');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.setPin({ pin: pinValue, current_pin: hasPin ? currentPin : undefined });
+      setHasPin(true);
+      setShowPinModal(false);
+      setPinValue('');
+      setCurrentPin('');
+      setConfirmPin('');
+      setSuccess('Transaction PIN saved. It will be required for transfers.');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (e: any) {
+      setError(e?.message || 'Could not save PIN');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const signOut = () => {
     logout();
     navigate('/');
@@ -283,10 +317,13 @@ export default function ProfilePage() {
           <SettingsRow
             icon={Lock}
             label="Transaction PIN"
-            value="Not set"
+            value={hasPin ? 'Set · required for transfers' : 'Not set'}
             onClick={() => {
-              setSuccess('Transaction PIN feature coming soon.');
-              setTimeout(() => setSuccess(''), 3000);
+              setError('');
+              setPinValue('');
+              setCurrentPin('');
+              setConfirmPin('');
+              setShowPinModal(true);
             }}
           />
           <SettingsRow
@@ -517,6 +554,49 @@ export default function ProfilePage() {
             onClick={() => void handleSignOutEverywhere()}
           >
             Sign out everywhere
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showPinModal}
+        onClose={() => setShowPinModal(false)}
+        title={hasPin ? 'Change transaction PIN' : 'Set transaction PIN'}
+        description="Your PIN authorises transfers between Rubicon accounts."
+      >
+        <div className="space-y-4">
+          {error && <div className="text-sm text-red-400">{error}</div>}
+          {hasPin && (
+            <Input
+              label="Current PIN"
+              type="password"
+              inputMode="numeric"
+              value={currentPin}
+              onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="••••"
+            />
+          )}
+          <Input
+            label="New PIN"
+            type="password"
+            inputMode="numeric"
+            value={pinValue}
+            onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="4–6 digits"
+          />
+          <Input
+            label="Confirm PIN"
+            type="password"
+            inputMode="numeric"
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="4–6 digits"
+          />
+        </div>
+        <div className="mt-6 flex gap-3">
+          <Button variant="secondary" onClick={() => setShowPinModal(false)}>Cancel</Button>
+          <Button onClick={handleSetPin} loading={busy} loadingLabel="Saving…" fullWidth>
+            Save PIN
           </Button>
         </div>
       </Modal>

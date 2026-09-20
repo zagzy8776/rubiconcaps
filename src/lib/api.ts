@@ -148,6 +148,7 @@ export const api = {
     to_account_number: string;
     amount: number;
     reference?: string;
+    transaction_pin?: string;
   }) => request('/transfers', { method: 'POST', body: JSON.stringify(body) }),
   getTransfers: (account_id?: string) =>
     request(`/transfers${account_id ? `?account_id=${account_id}` : ''}`),
@@ -176,6 +177,23 @@ export const api = {
   markAllNotificationsRead: () =>
     request('/notifications/read-all', { method: 'POST' }),
 
+
+  getPinStatus: () => request('/profile/pin-status'),
+  setPin: (body: { pin: string; current_pin?: string }) =>
+    request('/profile/pin', { method: 'POST', body: JSON.stringify(body) }),
+  verifyPin: (pin: string) =>
+    request('/profile/pin/verify', { method: 'POST', body: JSON.stringify({ pin }) }),
+
+  requestCryptoDeposit: (id: string, body: { amount: number; reference?: string }) =>
+    request(`/crypto/${id}/deposit-request`, { method: 'POST', body: JSON.stringify(body) }),
+  adminCryptoDeposits: () => adminRequest('/admin/crypto-deposits'),
+  reviewCryptoDeposit: (id: string, body: { status: string; admin_note?: string }) =>
+    adminRequest(`/admin/crypto-deposits/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  adminUpdateUser: (id: string, body: Record<string, unknown>) =>
+    adminRequest(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  adminUpdateAccount: (id: string, body: Record<string, unknown>) =>
+    adminRequest(`/admin/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   getSessions: () => request('/sessions'),
   revokeSession: (id: string) =>
     request(`/sessions/${id}/revoke`, { method: 'POST' }),
