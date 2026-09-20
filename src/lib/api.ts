@@ -160,6 +160,21 @@ export const api = {
   adminCrypto: (status = 'all') => adminRequest(`/admin/crypto?status=${status}`),
   reviewCrypto: (id: string, body: { status: string; admin_note?: string }) =>
     adminRequest(`/admin/crypto/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  adjustCryptoBalance: (id: string, body: { amount: number; reason?: string; transaction_type?: string }) =>
+    adminRequest(`/admin/crypto/${id}/adjust`, { method: 'POST', body: JSON.stringify(body) }),
+
+  setAccountStatus: (id: string, body: { action: string }) =>
+    adminRequest(`/admin/accounts/${id}/status`, { method: 'POST', body: JSON.stringify(body) }),
+
+  getAuditLogs: (q = '') =>
+    adminRequest(`/admin/audit-logs${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+
+  getNotifications: (unread = false) =>
+    request(`/notifications${unread ? '?unread=true' : ''}`),
+  markNotificationRead: (id: string) =>
+    request(`/notifications/${id}/read`, { method: 'PATCH' }),
+  markAllNotificationsRead: () =>
+    request('/notifications/read-all', { method: 'POST' }),
 };
 
 export function formatMoney(amount: number | string, currency = 'USD') {
@@ -174,4 +189,16 @@ export function formatMoney(amount: number | string, currency = 'USD') {
   } catch {
     return `${n.toLocaleString('en-GB')} ${currency}`;
   }
+}
+
+
+/** Re-export for components that import formatDate from api */
+export function formatDate(d: string) {
+  return new Date(d).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
