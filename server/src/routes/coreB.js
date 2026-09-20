@@ -5,6 +5,9 @@ export function mountCoreB(app, deps) {
 
 app.get('/api/admin/overview', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    const { backfillMissingAccounts } = await import('../helpers.js');
+    await backfillMissingAccounts();
+
     const [users, accounts, assets, recent, pending] = await Promise.all([
       query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_locked) as locked FROM profiles`),
       query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_locked) as locked FROM accounts`),
@@ -27,6 +30,8 @@ app.get('/api/admin/overview', authMiddleware, adminMiddleware, async (req, res)
 
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    const { backfillMissingAccounts } = await import('../helpers.js');
+    await backfillMissingAccounts();
     const search = req.query.q || '';
     const { rows } = await query(
       `SELECT id, email, full_name, role, is_locked, created_at, last_login,
@@ -66,10 +71,15 @@ app.patch('/api/admin/users/:id/lock', authMiddleware, adminMiddleware, async (r
 
 app.get('/api/admin/accounts', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    const { backfillMissingAccounts } = await import('../helpers.js');
+    await backfillMissingAccounts();
     const search = req.query.q || '';
     const { rows } = await query(
-      `SELECT a.*, p.email, p.full_name FROM accounts a JOIN profiles p ON p.id = a.user_id
-       WHERE a.account_number ILIKE $1 OR p.email ILIKE $1 OR p.full_name ILIKE $1
+      `SELECT a.*, p.email, p.full_name FROM accounts a
+       LEFT JOIN profiles p ON p.id = a.user_id
+       WHERE COALESCE(a.account_number, '') ILIKE $1
+          OR COALESCE(p.email, '') ILIKE $1
+          OR COALESCE(p.full_name, '') ILIKE $1
        ORDER BY a.created_at DESC LIMIT 100`,
       [`%${search}%`]
     );

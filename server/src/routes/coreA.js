@@ -2,8 +2,12 @@
 export function mountCoreA(app, deps) {
   const { query, withTransaction, authMiddleware, adminMiddleware, getProfile,
     createNotification, createAuditLog, buildAccountIdentity, signToken } = deps;
+
 app.get('/api/accounts', authMiddleware, async (req, res) => {
   try {
+    const { ensurePrimaryAccount } = await import('../helpers.js');
+    await ensurePrimaryAccount(req.user.id);
+
     let rows;
     try {
       rows = (await query(
