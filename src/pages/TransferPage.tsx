@@ -54,7 +54,7 @@ export default function TransferPage() {
     const cleaned = toNumber.replace(/\s+/g, '');
     if (cleaned.length < 10) {
       setPayee(null);
-      setPayeeHint(cleaned ? 'Keep typing the account number…' : '');
+      setPayeeHint('');
       return;
     }
     let dead = false;
@@ -71,7 +71,7 @@ export default function TransferPage() {
           setPayeeHint('');
         } else {
           setPayee(null);
-          setPayeeHint('Not a Rubicon account — check the number before you send.');
+          setPayeeHint('');
         }
       } catch {
         if (!dead) setPayee(null);
@@ -127,7 +127,7 @@ export default function TransferPage() {
 
         <SectionHeading title="Transfer history" icon={Clock} />
         {transfers.length === 0 && !loading ? (
-          <EmptyState icon={ArrowLeftRight} title="No transfers yet" description="Send money to another Rubicon account to see it here." />
+          <EmptyState icon={ArrowLeftRight} title="No transfers yet" description="Send money to another account to see it here." />
         ) : (
           <div className="space-y-3">
             {transfers.map((tx: any) => {
@@ -183,14 +183,13 @@ export default function TransferPage() {
                       return <option key={a.id} value={a.id}>{m.flag} {a.account_name || a.currency} — {formatMoney(a.balance, a.currency)}</option>;
                     })}
                   </Select>
-                  <Input label="Recipient account number" value={toNumber} onChange={(e) => setToNumber(e.target.value.replace(/[^0-9A-Za-z-]/g, ''))} placeholder="12-digit number" />
-                  {payee && (
-                    <div className="rounded-control border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                      <p className="text-caption text-emerald-300">Rubicon payee</p>
-                      <p className="text-sm font-semibold">{payee.name}</p>
-                    </div>
-                  )}
-                  {!payee && payeeHint && <p className="text-caption text-content-muted">{payeeHint}</p>}
+                  <Input
+                    label="Recipient account number"
+                    value={toNumber}
+                    onChange={(e) => setToNumber(e.target.value.replace(/[^0-9A-Za-z-]/g, ''))}
+                    placeholder="12-digit number"
+                    hint={payee?.name || payeeHint || undefined}
+                  />
                   <Input label="Amount" type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
                   <Input label="Reference (optional)" value={reference} onChange={(e) => setReference(e.target.value)} />
                 </>
