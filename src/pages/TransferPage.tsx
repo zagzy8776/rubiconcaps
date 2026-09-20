@@ -12,6 +12,26 @@ import {
 } from 'lucide-react';
 import { cx } from '../lib/designTokens';
 
+const RAILS = {
+  ach: {
+    label: 'ACH',
+    hint: 'US domestic. Uses routing + account number. Usually 1–2 business days.',
+    timing: '1–2 business days',
+  },
+  wire: {
+    label: 'Wire transfer',
+    hint: 'Same-day bank wire. Needs routing number and account number.',
+    timing: 'Same day if sent before cut-off',
+  },
+  swift: {
+    label: 'SWIFT',
+    hint: 'International. Needs SWIFT/BIC and IBAN or account number.',
+    timing: '1–5 business days',
+  },
+} as const;
+
+type Rail = keyof typeof RAILS;
+
 export default function TransferPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [transfers, setTransfers] = useState<any[]>([]);
@@ -30,6 +50,11 @@ export default function TransferPage() {
   const [outcome, setOutcome] = useState<{ ok: boolean; title: string; detail: string } | null>(null);
   const [payee, setPayee] = useState<any>(null);
   const [payeeHint, setPayeeHint] = useState('');
+  const [rail, setRail] = useState<Rail>('wire');
+  const [routing, setRouting] = useState('');
+  const [swiftBic, setSwiftBic] = useState('');
+  const [iban, setIban] = useState('');
+  const [bankName, setBankName] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +111,17 @@ export default function TransferPage() {
     const ty = String(t.type || '').toLowerCase();
     return ty === 'transfer_in' || ty === 'deposit' || ty === 'credit';
   };
+  const internal = Boolean(payee?.name);
+
+  const buildReference = () => {
+    const bits = [RAILS[rail].label];
+    if (reference.trim()) bits.push(reference.trim());
+    if (!internal && routing) bits.push(`RTN ${routing}`);
+    if (!internal && swiftBic) bits.push(`BIC ${swiftBic}`);
+    if (!internal && iban) bits.push(`IBAN ${iban}`);
+    if (!internal && bankName) bits.push(bankName);
+    return bits.join(' · ');
+  };
 
   const send = async () => {
     setFormError('');
@@ -96,16 +132,19 @@ export default function TransferPage() {
         from_account_id: fromAccount,
         to_account_number: cleaned,
         amount: parseFloat(amount),
-        reference: reference.trim() || undefined,
+        reference: buildReference(),
         transaction_pin: transactionPin || undefined,
       });
       const money = formatMoney(parseFloat(amount), sel?.currency || 'USD');
-      setOutcome({ ok: true, title: 'Transfer successful', detail: `${money} sent${payee?.name ? ` to ${payee.name}` : ` to ${cleaned}`}.` });
+      const who = payee?.name ? ` to ${payee.name}` : ` to ${cleaned}`;
+      const when = internal ? 'Posted immediately.' : `Expected ${RAILS[rail].timing.toLowerCase()}.`;
+      setOutcome({ ok: true, title: `${RAILS[rail].label} sent`, detail: `${money} sent${who}. ${when}` });
       setStep('done');
       setToNumber(''); setAmount(''); setReference(''); setTransactionPin('');
+      setRouting(''); setSwiftBic(''); setIban(''); setBankName('');
       await load();
     } catch (e: any) {
-      setOutcome({ ok: false, title: 'Transfer failed', detail: e?.message || 'The payment could not be sent.' });
+      setOutcome({ ok: false, title: `${RAILS[rail].label} failed`, detail: e?.message || 'The payment could not be sent.' });
       setStep('done');
     } finally {
       setBusy(false);
@@ -113,6 +152,20 @@ export default function TransferPage() {
   };
 
   const openSend = () => { setFormError(''); setStep('form'); setOutcome(null); setShowModal(true); };
+
+  const goReview = () => {
+    if (!fromAccount) return setFormError('Select an account');
+    if (!toNumber.trim()) return setFormError('Enter the recipient account number');
+    if (!amount || parseFloat(amount) <= 0) return setFormError('Enter a valid amount');
+    if (!internal && (rail === 'ach' || rail === 'wire') && routing.replace(/\D/g, '').length !== 9) {
+      return setFormError('Enter the 9-digit routing number');
+    }
+    if (!internal && rail === 'swift' && swiftBic.replace(/\s+/g, '').length < 8) {
+      return setFormError('Enter the SWIFT / BIC code');
+    }
+    setFormError('');
+    setStep('review');
+  };
 
   return (
     <div className="min-h-screen bg-surface">
@@ -140,7 +193,7 @@ export default function TransferPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold">{credit ? 'Received' : 'Sent'} {formatMoney(Math.abs(parseFloat(tx.amount)), tx.currency)}</p>
-                      <p className="text-caption text-content-muted truncate">{tx.description || ''}</p>
+                      <p className="text-caption text-content-muted truncate">{tx.description || tx.reference || ''}</p>
                       <p className="text-micro text-content-muted">{formatRelativeDay(tx.created_at)}</p>
                     </div>
                     {tx.status && <StatusBadge status={tx.status} />}
@@ -171,9 +224,14 @@ export default function TransferPage() {
               {formError && <Alert tone="error">{formError}</Alert>}
               {step === 'review' ? (
                 <div className="rounded-card border border-line-subtle px-4 py-3 space-y-2 text-sm">
+                  <p><span className="text-content-muted">Method </span>{RAILS[rail].label}</p>
                   <p><span className="text-content-muted">From </span>{sel ? `${sel.account_name || sel.currency} · ${maskAccountNumber(sel.account_number)}` : '—'}</p>
                   <p><span className="text-content-muted">To </span>{payee?.name ? `${payee.name} · ` : ''}{toNumber}</p>
+                  {!internal && routing && <p><span className="text-content-muted">Routing </span>{routing}</p>}
+                  {!internal && swiftBic && <p><span className="text-content-muted">SWIFT </span>{swiftBic}</p>}
+                  {!internal && iban && <p><span className="text-content-muted">IBAN </span>{iban}</p>}
                   <p className="font-semibold">{formatMoney(parseFloat(amount) || 0, sel?.currency || 'USD')}</p>
+                  <p className="text-caption text-content-muted">{internal ? 'On-platform — posts immediately.' : RAILS[rail].hint}</p>
                 </div>
               ) : (
                 <>
@@ -183,13 +241,47 @@ export default function TransferPage() {
                       return <option key={a.id} value={a.id}>{m.flag} {a.account_name || a.currency} — {formatMoney(a.balance, a.currency)}</option>;
                     })}
                   </Select>
+                  <Select label="Transfer type" value={rail} onChange={(e) => setRail(e.target.value as Rail)} hint={RAILS[rail].hint}>
+                    <option value="wire">Wire transfer</option>
+                    <option value="ach">ACH</option>
+                    <option value="swift">SWIFT transfer</option>
+                  </Select>
                   <Input
-                    label="Recipient account number"
+                    label={rail === 'swift' ? 'Account number or IBAN' : 'Recipient account number'}
                     value={toNumber}
-                    onChange={(e) => setToNumber(e.target.value.replace(/[^0-9A-Za-z-]/g, ''))}
-                    placeholder="12-digit number"
+                    onChange={(e) => setToNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ''))}
+                    placeholder={rail === 'swift' ? 'IBAN or account number' : '12-digit number'}
                     hint={payee?.name || payeeHint || undefined}
                   />
+                  {!internal && (rail === 'ach' || rail === 'wire') && (
+                    <Input
+                      label="Routing number"
+                      value={routing}
+                      onChange={(e) => setRouting(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                      placeholder="9 digits"
+                      inputMode="numeric"
+                    />
+                  )}
+                  {!internal && rail === 'wire' && (
+                    <Input label="Bank name (optional)" value={bankName} onChange={(e) => setBankName(e.target.value)} />
+                  )}
+                  {!internal && rail === 'swift' && (
+                    <>
+                      <Input
+                        label="SWIFT / BIC"
+                        value={swiftBic}
+                        onChange={(e) => setSwiftBic(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 11))}
+                        placeholder="e.g. CHASUS33"
+                      />
+                      <Input
+                        label="IBAN (if different)"
+                        value={iban}
+                        onChange={(e) => setIban(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                        placeholder="Optional if account number already entered"
+                      />
+                      <Input label="Bank name (optional)" value={bankName} onChange={(e) => setBankName(e.target.value)} />
+                    </>
+                  )}
                   <Input label="Amount" type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
                   <Input label="Reference (optional)" value={reference} onChange={(e) => setReference(e.target.value)} />
                 </>
@@ -206,13 +298,7 @@ export default function TransferPage() {
                 ) : (
                   <>
                     <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-                    <Button fullWidth onClick={() => {
-                      if (!fromAccount) return setFormError('Select an account');
-                      if (!toNumber.trim()) return setFormError('Enter recipient account number');
-                      if (!amount || parseFloat(amount) <= 0) return setFormError('Enter a valid amount');
-                      setFormError('');
-                      setStep('review');
-                    }}>Review transfer</Button>
+                    <Button fullWidth onClick={goReview}>Review transfer</Button>
                   </>
                 )}
               </div>
