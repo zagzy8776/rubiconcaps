@@ -25,8 +25,17 @@ const emptyProfile = {
 
 function dateInput(v: any) {
   if (!v) return '';
-  const s = String(v);
-  return s.slice(0, 10);
+  const s = String(v).trim();
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return '';
 }
 
 export default function AdminCustomerModal({ open, userId, accountHint, onClose, onSaved }: Props) {
@@ -50,6 +59,9 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
         setProfile({
           ...emptyProfile,
           ...u,
+          phone: u.phone || '',
+          address: u.address || '',
+          country: u.country || 'GB',
           date_of_birth: dateInput(u.date_of_birth),
           is_locked: !!u.is_locked,
         });
@@ -151,7 +163,7 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
       open={open}
       onClose={onClose}
       title={profile.full_name || 'Customer record'}
-      description="View and set every field on this client and their wallets."
+      description="Scroll for address, KYC and every wallet. Save stays pinned at the bottom."
       widthClass="max-w-2xl"
       footer={
         <>
@@ -162,11 +174,11 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
         </>
       }
     >
-      {error && <Alert tone="error" className="mb-4">{error}</Alert>}
+      {error && <Alert tone="error">{error}</Alert>}
       {loading ? (
         <p className="text-sm text-content-muted">Loading customer…</p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-2">
           <section className="space-y-3">
             <h4 className="text-sm font-semibold text-content-primary">Personal</h4>
             <Input label="Full legal name" value={profile.full_name}
@@ -174,7 +186,8 @@ export default function AdminCustomerModal({ open, userId, accountHint, onClose,
             <Input label="Email" type="email" value={profile.email}
               onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
             <Input label="Phone" type="tel" value={profile.phone || ''}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              placeholder="+1 …" hint={!profile.phone ? 'Not on file — type it here and save.' : undefined} />
             <Input label="Date of birth" type="date" value={profile.date_of_birth || ''}
               onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })} />
             <Input label="Country" value={profile.country || ''}

@@ -14,18 +14,10 @@ export interface ModalProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  /** Tailwind max-width class for the panel (defaults to max-w-md). */
   widthClass?: string;
-  /** Allows clicks on the backdrop to dismiss the dialog. */
   closeOnBackdrop?: boolean;
 }
 
-/**
- * Accessible dialog with mobile-safe layout:
- * - respects notch / status bar (safe-area insets)
- * - max height so title + close never clip off-screen
- * - sticky header; body scrolls independently
- */
 export function Modal({
   open,
   onClose,
@@ -94,9 +86,8 @@ export function Modal({
       className={cx(
         'fixed inset-0 z-modal flex items-end sm:items-center justify-center',
         'animate-fade-in',
-        /* Safe area so panel never sits under notch / home indicator */
         'pt-[max(1rem,env(safe-area-inset-top))]',
-        'pb-[max(1rem,env(safe-area-inset-bottom))]',
+        'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
         'px-[max(1rem,env(safe-area-inset-left))]',
         'pr-[max(1rem,env(safe-area-inset-right))]',
       )}
@@ -121,12 +112,10 @@ export function Modal({
           'border border-line-strong shadow-modal',
           'rounded-t-2xl sm:rounded-panel',
           'animate-slide-up focus:outline-none',
-          /* Never taller than the visible viewport (minus safe padding) */
           'max-h-[min(92dvh,calc(100vh-2rem))]',
           widthClass,
         )}
       >
-        {/* Sticky header — always visible */}
         <div
           className={cx(
             'flex items-start justify-between gap-3',
@@ -137,38 +126,26 @@ export function Modal({
           )}
         >
           <div className="min-w-0 pr-2">
-            <h3
-              id={titleId}
-              className="text-heading text-content-primary leading-tight"
-            >
+            <h3 id={titleId} className="text-heading text-content-primary leading-tight">
               {title}
             </h3>
             {description && (
-              <p
-                id={descriptionId}
-                className="text-caption text-content-secondary mt-1 leading-snug"
-              >
+              <p id={descriptionId} className="text-caption text-content-secondary mt-1 leading-snug">
                 {description}
               </p>
             )}
           </div>
-          <IconButton
-            size="sm"
-            label="Close dialog"
-            onClick={onClose}
-            className="shrink-0 -mr-1"
-          >
+          <IconButton size="sm" label="Close dialog" onClick={onClose} className="shrink-0 -mr-1">
             <X className="w-5 h-5" />
           </IconButton>
         </div>
 
-        {/* Scrollable body */}
         <div className="px-5 sm:px-6 py-5 overflow-y-auto overscroll-contain flex-1 min-h-0">
           {children}
         </div>
 
         {footer && (
-          <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-0 flex gap-3 shrink-0 border-t border-line-subtle">
+          <div className="px-5 sm:px-6 py-4 flex gap-3 shrink-0 border-t border-line-subtle bg-surface-raised z-10">
             {footer}
           </div>
         )}
