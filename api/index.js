@@ -1,23 +1,22 @@
 /**
  * Vercel Serverless Function entry point.
- * Wraps the Express app and runs migrations on cold start.
+ * Do not await migrations before serving — a stuck Aiven pool was taking
+ * down every /api request (browser showed Failed to fetch).
  */
 import app from '../server/src/index.js';
 import { runMigrations } from '../server/src/migrations.js';
 
-let migrationsDone = false;
+let migrationsStarted = false;
+
+function kickMigrations() {
+  if (migrationsStarted) return;
+  migrationsStarted = true;
+  runMigrations().catch((err) => {
+    console.error('Migration error:', err.message);
+  });
+}
 
 export default async function handler(req, res) {
-  // Run migrations once on cold start
-  if (!migrationsDone) {
-    try {
-      await runMigrations();
-      migrationsDone = true;
-    } catch (err) {
-      console.error('Migration error:', err.message);
-      // Continue anyway — tables may already exist
-      migrationsDone = true;
-    }
-  }
+  kickMigrations();
   return app(req, res);
 }

@@ -8,38 +8,41 @@ function getAdminToken() {
   return localStorage.getItem('rubicon_admin_token');
 }
 
-async function request(path: string, options: RequestInit = {}) {
-  const token = getToken();
+async function rawFetch(path: string, options: RequestInit, token: string | null) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API}${path}`, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const res = await fetch(`${API}${path}`, { ...options, headers, signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return data;
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('The server took too long. Wait a few seconds and try again.');
+    }
+    if (err?.message === 'Failed to fetch' || err?.name === 'TypeError') {
+      throw new Error('Cannot reach the API. Wait 20 seconds and try again — the database was overloaded.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(t);
   }
-  return data;
+}
+
+async function request(path: string, options: RequestInit = {}) {
+  return rawFetch(path, options, getToken());
 }
 
 async function adminRequest(path: string, options: RequestInit = {}) {
-  const token = getAdminToken() || getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${API}${path}`, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
-  }
-  return data;
+  return rawFetch(path, options, getAdminToken() || getToken());
 }
 
 export const api = {
@@ -209,7 +212,7 @@ export const api = {
   }) => request('/profile/preferences', { method: 'PATCH', body: JSON.stringify(body) }),
 
   downloadStatementPdf: async (accountId: string, params?: { from?: string; to?: string }) => {
-    const token = getToken();
+    const token = getAdminToken() || getToken();
     const q = new URLSearchParams();
     if (params?.from) q.set('from', params.from);
     if (params?.to) q.set('to', params.to);
