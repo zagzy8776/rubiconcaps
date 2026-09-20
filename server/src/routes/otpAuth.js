@@ -160,12 +160,19 @@ router.post('/api/auth/login', async (req, res) => {
       attempts: 0,
     });
 
-    voidEmail(emailLoginOtp({
+    const sent = await emailLoginOtp({
       to: user.email,
       fullName: user.full_name,
       code,
       expiresMinutes: 10,
-    }));
+    });
+    if (!sent?.ok) {
+      console.error('[login] OTP email failed:', sent?.error || 'unknown');
+      return res.status(503).json({
+        error: 'We could not send the verification code. Check your email address or try again in a minute. If this continues, contact support@rubiconcapital.org.',
+        email_error: true,
+      });
+    }
 
     res.json({
       requires_otp: true,
@@ -287,12 +294,19 @@ router.post('/api/auth/resend-otp', async (req, res) => {
       [hashCode(code), expires.toISOString(), challenge_id]
     ).catch(() => {});
 
-    voidEmail(emailLoginOtp({
+    const sent = await emailLoginOtp({
       to: ch.email,
       fullName: ch.fullName,
       code,
       expiresMinutes: 10,
-    }));
+    });
+    if (!sent?.ok) {
+      console.error('[resend-otp] email failed:', sent?.error || 'unknown');
+      return res.status(503).json({
+        error: 'Could not resend the code. Wait a moment and try again, or contact support@rubiconcapital.org.',
+        email_error: true,
+      });
+    }
 
     res.json({ success: true, email_hint: maskEmail(ch.email), expires_in: 600 });
   } catch (err) {
