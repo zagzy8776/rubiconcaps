@@ -66,37 +66,40 @@ export async function authMiddleware(req, res, next) {
   try {
     const payload = verifyToken(header.slice(7));
 
-    if (payload.sv != null && payload.id) {
-      try {
-        const { rows } = await query(
-          `SELECT COALESCE(session_version, 1) AS session_version FROM profiles WHERE id = $1`,
-          [payload.id]
-        );
-        if (rows[0] && Number(rows[0].session_version) !== Number(payload.sv)) {
-          return res.status(401).json({ error: 'Session ended. Sign in again.' });
+    // Owner console token is not a customer session — skip profile/session checks.
+    if (payload.id !== 'admin-owner') {
+      if (payload.sv != null && payload.id) {
+        try {
+          const { rows } = await query(
+            `SELECT COALESCE(session_version, 1) AS session_version FROM profiles WHERE id = $1`,
+            [payload.id]
+          );
+          if (rows[0] && Number(rows[0].session_version) !== Number(payload.sv)) {
+            return res.status(401).json({ error: 'Session ended. Sign in again.' });
+          }
+        } catch {
+          /* ignore if column missing */
         }
-      } catch {
-        /* ignore if column missing */
       }
-    }
 
-    if (payload.sid && payload.id) {
-      try {
-        const { rows } = await query(
-          `SELECT revoked_at FROM user_sessions WHERE id = $1 AND user_id = $2`,
-          [payload.sid, payload.id]
-        );
-        if (rows[0]?.revoked_at) {
-          return res.status(401).json({ error: 'Session ended. Sign in again.' });
+      if (payload.sid && payload.id) {
+        try {
+          const { rows } = await query(
+            `SELECT revoked_at FROM user_sessions WHERE id = $1 AND user_id = $2`,
+            [payload.sid, payload.id]
+          );
+          if (rows[0]?.revoked_at) {
+            return res.status(401).json({ error: 'Session ended. Sign in again.' });
+          }
+          if (rows[0]) {
+            query(
+              `UPDATE user_sessions SET last_seen_at = now() WHERE id = $1 AND revoked_at IS NULL`,
+              [payload.sid]
+            ).catch(() => {});
+          }
+        } catch {
+          /* table may not exist yet */
         }
-        if (rows[0]) {
-          query(
-            `UPDATE user_sessions SET last_seen_at = now() WHERE id = $1 AND revoked_at IS NULL`,
-            [payload.sid]
-          ).catch(() => {});
-        }
-      } catch {
-        /* table may not exist yet */
       }
     }
 
@@ -108,7 +111,10 @@ export async function authMiddleware(req, res, next) {
 }
 
 export function adminMiddleware(req, res, next) {
-  if (req.user?.role !== 'admin') {
+  const adminEmail = String(process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+  const tokenEmail = String(req.user?.email || '').toLowerCase().trim();
+  const ownerToken = req.user?.id === 'admin-owner';
+  if (!adminEmail || !ownerToken || tokenEmail !== adminEmail) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
