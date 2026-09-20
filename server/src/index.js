@@ -9,7 +9,7 @@ import {
   authMiddleware, adminMiddleware, getProfile
 } from './auth.js';
 import { runMigrations } from './migrations.js';
-import { createNotification, createAuditLog } from './helpers.js';
+import { createNotification, createAuditLog, ensurePrimaryAccount } from './helpers.js';
 import { emailWelcome, emailLoginAlert, emailAdminDigest, voidEmail } from './email.js';
 import { buildAccountIdentity } from './bankIdentity.js';
 import depositRoutes from './routes/deposits.js';
@@ -61,10 +61,11 @@ app.post('/api/auth/register', async (req, res) => {
     const password_hash = await hashPassword(password);
     const OWNER_EMAIL = (process.env.OWNER_EMAIL || '').toLowerCase();
     const role = email.toLowerCase() === OWNER_EMAIL ? 'admin' : 'user';
+    const countryCode = country ? String(country).trim() : 'GB';
     const { rows } = await query(
       `INSERT INTO profiles (email, password_hash, full_name, role, phone, date_of_birth, address, country)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, email, full_name, role, phone, created_at`,
+       RETURNING id, email, full_name, role, phone, created_at, country`,
       [
         email.toLowerCase(),
         password_hash,
@@ -73,14 +74,18 @@ app.post('/api/auth/register', async (req, res) => {
         phone ? String(phone).trim() : null,
         date_of_birth || null,
         address ? String(address).trim() : null,
-        country ? String(country).trim() : 'GB',
+        countryCode,
       ]
     );
     const user = rows[0];
     const token = signToken(user);
     await query(`INSERT INTO activity_log (user_id, action, description) VALUES ($1, 'register', 'New user registered')`, [user.id]).catch(() => {});
+    const account = await ensurePrimaryAccount(user.id, {
+      fullName: user.full_name,
+      country: countryCode,
+    });
     voidEmail(emailWelcome({ to: user.email, fullName: user.full_name }));
-    res.status(201).json({ user, token });
+    res.status(201).json({ user, token, account });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Registration failed' });
