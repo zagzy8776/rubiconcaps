@@ -1,8 +1,24 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { authMiddleware } from '../auth.js';
+import { authMiddleware, adminMiddleware } from '../auth.js';
 
 const router = Router();
+
+const SUPPORT_WHATSAPP = (process.env.SUPPORT_WHATSAPP || '+447448216273').replace(/\s+/g, '');
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@rubiconcapital.org';
+
+query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT`).catch((e) => {
+  console.warn('avatar_url column:', e.message);
+});
+
+router.get('/api/support', (_req, res) => {
+  const digits = SUPPORT_WHATSAPP.replace(/[^\d]/g, '');
+  res.json({
+    whatsapp: SUPPORT_WHATSAPP,
+    whatsapp_link: `https://wa.me/${digits}`,
+    email: SUPPORT_EMAIL,
+  });
+});
 
 router.get('/api/transfers/lookup', authMiddleware, async (req, res) => {
   try {
@@ -22,7 +38,7 @@ router.get('/api/transfers/lookup', authMiddleware, async (req, res) => {
     res.json({
       found: true,
       payee: {
-        name: a.full_name || a.account_name || 'Rubicon client',
+        name: a.full_name || a.account_name || 'Client',
         account_name: a.account_name,
         account_number: a.account_number,
         currency: a.currency,
@@ -32,6 +48,28 @@ router.get('/api/transfers/lookup', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('lookup:', err);
     res.json({ found: false });
+  }
+});
+
+router.patch('/api/admin/users/:id/avatar', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const image = String(req.body?.image || req.body?.avatar_url || '');
+    if (!image.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Upload a JPEG or PNG image' });
+    }
+    if (image.length > 450000) {
+      return res.status(400).json({ error: 'Photo is too large. Use a smaller picture.' });
+    }
+    await query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT`).catch(() => {});
+    const { rows } = await query(
+      `UPDATE profiles SET avatar_url = $1 WHERE id = $2 RETURNING id, full_name, avatar_url`,
+      [image, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, user: rows[0] });
+  } catch (err) {
+    console.error('avatar:', err);
+    res.status(500).json({ error: err.message || 'Could not save photo' });
   }
 });
 
