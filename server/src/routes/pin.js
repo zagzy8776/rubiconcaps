@@ -5,6 +5,22 @@ import { authMiddleware, getProfile } from '../auth.js';
 
 const router = Router();
 
+export async function assertTransactionPin(userId, pin) {
+  try {
+    const { rows } = await query(`SELECT transaction_pin_hash FROM profiles WHERE id = $1`, [userId]);
+    const hash = rows[0]?.transaction_pin_hash;
+    if (!hash) return { ok: true, skipped: true };
+    const code = String(pin || '');
+    if (!code) return { ok: false, error: 'Transaction PIN required' };
+    const match = await bcrypt.compare(code, hash);
+    if (!match) return { ok: false, error: 'Incorrect transaction PIN' };
+    return { ok: true };
+  } catch (err) {
+    console.warn('assertTransactionPin:', err.message);
+    return { ok: true, skipped: true };
+  }
+}
+
 router.get('/api/profile/pin-status', authMiddleware, async (req, res) => {
   try {
     const { rows } = await query(`SELECT transaction_pin_hash FROM profiles WHERE id = $1`, [req.user.id]);
