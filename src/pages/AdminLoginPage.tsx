@@ -26,7 +26,12 @@ export default function AdminLoginPage() {
       await login(email.trim(), password);
       navigate('/admin');
     } catch (err: any) {
-      setError(err?.message || 'Invalid admin credentials.');
+      const msg = String(err?.message || '');
+      if (/expected pattern|uuid|self-signed|failed to fetch|busy/i.test(msg)) {
+        setError('Could not reach admin login. Wait 10 seconds and try again.');
+      } else {
+        setError(msg || 'Invalid admin credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +66,7 @@ export default function AdminLoginPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {error && (
               <Alert tone="error" onDismiss={() => setError('')}>
                 {error}
@@ -70,7 +75,10 @@ export default function AdminLoginPage() {
 
             <Input
               label="Admin email"
-              type="email"
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Configured admin email"
