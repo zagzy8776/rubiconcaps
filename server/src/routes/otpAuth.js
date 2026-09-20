@@ -8,7 +8,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { query } from '../db.js';
 import {
-  signToken, comparePassword,
+  signToken, createSession, comparePassword,
 } from '../auth.js';
 import { emailLoginOtp, emailLoginAlert, voidEmail } from '../email.js';
 
@@ -121,7 +121,8 @@ router.post('/api/auth/login', async (req, res) => {
     const trustDevice = !!(req.body && req.body.trust_device);
     if (trustDevice) {
       await query('UPDATE profiles SET last_login = now() WHERE id = $1', [user.id]).catch(() => {});
-      const token = signToken(user);
+      const sessionClaims = await createSession(user.id, req);
+      const token = signToken(user, sessionClaims);
       voidEmail(emailLoginAlert({
         to: user.email,
         fullName: user.full_name,
@@ -252,7 +253,8 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     if (user.is_locked) return res.status(403).json({ error: 'Account locked. Please contact support.' });
 
     await query('UPDATE profiles SET last_login = now() WHERE id = $1', [user.id]);
-    const token = signToken(user);
+    const sessionClaims = await createSession(user.id, req);
+    const token = signToken(user, sessionClaims);
     voidEmail(emailLoginAlert({
       to: user.email,
       fullName: user.full_name,

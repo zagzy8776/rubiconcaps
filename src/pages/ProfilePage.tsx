@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -7,76 +7,204 @@ import { Badge, Button, Card, Input, Modal, PageHeader, StatusBadge } from '../c
 import { SettingsRow, SettingsSection, SettingsToggle } from '../components/ui/SettingsRow';
 import { cx } from '../lib/designTokens';
 import {
-  Bell, Calendar, Globe2, HelpCircle, KeyRound, Landmark, Languages,
-  LayoutGrid, LifeBuoy, Lock, LogOut, Mail, MapPin, Phone, ShieldCheck, Smartphone,
+  Bell, Calendar, Globe2, HelpCircle, KeyRound, Landmark,
+  LifeBuoy, Lock, LogOut, Mail, MapPin, Phone, ShieldCheck, Smartphone,
   User, FileText, Scale, Info,
 } from 'lucide-react';
 
 function getInitials(name?: string) {
   if (!name) return '?';
-  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return name.split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 }
+
+type SessionRow = {
+  id: string;
+  device: string;
+  ip?: string;
+  created_at?: string;
+  last_seen_at?: string;
+  revoked?: boolean;
+  current?: boolean;
+};
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [notifEnabled, setNotifEnabled] = useState(true);
-  const [loginAlerts, setLoginAlerts] = useState(true);
+  const [notifLogin, setNotifLogin] = useState(true);
+  const [notifTransfers, setNotifTransfers] = useState(true);
+  const [notifDeposits, setNotifDeposits] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [editField, setEditField] = useState('');
   const [editValue, setEditValue] = useState('');
   const [editLabel, setEditLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
 
-  const profileFields = useMemo(() => ({
-    phone: 'Not set', dob: 'Not set', address: 'Not set', country: 'United Kingdom',
-  }), []);
+  const profileFields = useMemo(
+    () => ({
+      phone: 'Not set',
+      dob: 'Not set',
+      address: 'Not set',
+      country: 'United Kingdom',
+    }),
+    []
+  );
+
+  useEffect(() => {
+    api
+      .getPreferences()
+      .then((res: any) => {
+        const p = res.preferences || {};
+        if (typeof p.notify_login === 'boolean') setNotifLogin(p.notify_login);
+        if (typeof p.notify_transfers === 'boolean') setNotifTransfers(p.notify_transfers);
+        if (typeof p.notify_deposits === 'boolean') setNotifDeposits(p.notify_deposits);
+      })
+      .catch(() => {});
+  }, []);
+
+  const savePref = async (key: string, value: boolean) => {
+    try {
+      const res: any = await api.updatePreferences({ [key]: value });
+      const p = res.preferences || {};
+      if (typeof p.notify_login === 'boolean') setNotifLogin(p.notify_login);
+      if (typeof p.notify_transfers === 'boolean') setNotifTransfers(p.notify_transfers);
+      if (typeof p.notify_deposits === 'boolean') setNotifDeposits(p.notify_deposits);
+      setSuccess('Preferences saved.');
+      setTimeout(() => setSuccess(''), 2500);
+    } catch (e: any) {
+      setError(e?.message || 'Could not save preference');
+    }
+  };
+
+  const loadSessions = async () => {
+    setSessionsLoading(true);
+    setError('');
+    try {
+      const res: any = await api.getSessions();
+      setSessions(res.sessions || []);
+      setShowSessionsModal(true);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load sessions');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const handleRevokeSession = async (id: string, isCurrent: boolean) => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.revokeSession(id);
+      if (isCurrent) {
+        logout();
+        navigate('/auth');
+        return;
+      }
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, revoked: true } : s)));
+      setSuccess('Session ended.');
+      setTimeout(() => setSuccess(''), 2500);
+    } catch (e: any) {
+      setError(e?.message || 'Could not end session');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSignOutEverywhere = async () => {
+    if (!confirm('Sign out of all devices? You will need to sign in again on this device too.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.revokeAllSessions();
+      logout();
+      navigate('/auth');
+    } catch (e: any) {
+      setError(e?.message || 'Could not sign out everywhere');
+      setBusy(false);
+    }
+  };
 
   const openEdit = (field: string, label: string, current: string) => {
-    setEditField(field); setEditLabel(label);
-    setEditValue(current === 'Not set' ? '' : current); setError(''); setShowEditModal(true);
+    setEditField(field);
+    setEditLabel(label);
+    setEditValue(current === 'Not set' ? '' : current);
+    setError('');
+    setShowEditModal(true);
   };
 
   const handleSaveProfile = async () => {
-    setBusy(true); setError('');
+    setBusy(true);
+    setError('');
     try {
-      setShowEditModal(false); setSuccess(`${editLabel} updated.`);
+      setShowEditModal(false);
+      setSuccess(`${editLabel} updated.`);
       setTimeout(() => setSuccess(''), 3000);
-    } catch (e: any) { setError(e?.message || 'Update failed'); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      setError(e?.message || 'Update failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handlePasswordChange = async () => {
     setError('');
-    if (!currentPw || !newPw) { setError('Fill in all password fields'); return; }
-    if (newPw.length < 8) { setError('New password must be at least 8 characters'); return; }
-    if (newPw !== confirmPw) { setError('Passwords do not match'); return; }
+    if (!currentPw || !newPw) {
+      setError('Fill in all password fields');
+      return;
+    }
+    if (newPw.length < 8) {
+      setError('New password must be at least 8 characters');
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setError('Passwords do not match');
+      return;
+    }
     setBusy(true);
     try {
       await api.changePassword({ current_password: currentPw, new_password: newPw });
-      setShowPasswordModal(false); setCurrentPw(''); setNewPw(''); setConfirmPw('');
+      setShowPasswordModal(false);
+      setCurrentPw('');
+      setNewPw('');
+      setConfirmPw('');
       setSuccess('Password changed successfully. A confirmation email was sent.');
       setTimeout(() => setSuccess(''), 4000);
-    } catch (e: any) { setError(e?.message || 'Password change failed'); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      setError(e?.message || 'Password change failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const signOut = () => { logout(); navigate('/'); };
+  const signOut = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <div className="min-h-screen bg-surface">
       <PageHeader title="Profile & Settings" backTo="/dashboard" />
       <main className="max-w-lg mx-auto px-4 sm:px-6 py-6 pb-32 space-y-6">
-        {error && <div className="rounded-control bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 text-sm">{error}</div>}
-        {success && <div className="rounded-control bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 text-sm">{success}</div>}
+        {error && (
+          <div className="rounded-control bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="rounded-control bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 text-sm">
+            {success}
+          </div>
+        )}
 
         <Card className="p-6">
           <div className="flex items-center gap-4">
@@ -88,7 +216,9 @@ export default function ProfilePage() {
               <p className="text-caption text-content-muted truncate">{user?.email}</p>
               <div className="flex items-center gap-2 mt-2">
                 <StatusBadge status={user?.is_locked ? 'locked' : 'active'} />
-                <Badge tone="neutral" dot>Email on file</Badge>
+                <Badge tone="neutral" dot>
+                  Email on file
+                </Badge>
               </div>
             </div>
           </div>
@@ -102,32 +232,99 @@ export default function ProfilePage() {
         </Card>
 
         <SettingsSection title="Personal Information">
-          <SettingsRow icon={User} label="Full Name" value={user?.full_name}
-            onClick={() => openEdit('full_name', 'Full Name', user?.full_name || '')} />
-          <SettingsRow icon={Mail} label="Email Address" value={user?.email}
-            onClick={() => openEdit('email', 'Email', user?.email || '')} />
-          <SettingsRow icon={Phone} label="Phone Number" value={profileFields.phone}
-            onClick={() => openEdit('phone', 'Phone Number', profileFields.phone)} />
-          <SettingsRow icon={Calendar} label="Date of Birth" value={profileFields.dob}
-            onClick={() => openEdit('date_of_birth', 'Date of Birth', profileFields.dob)} />
-          <SettingsRow icon={MapPin} label="Address" value={profileFields.address}
-            onClick={() => openEdit('address', 'Address', profileFields.address)} />
-          <SettingsRow icon={Globe2} label="Country" value={profileFields.country}
-            onClick={() => openEdit('country', 'Country', profileFields.country)} />
+          <SettingsRow
+            icon={User}
+            label="Full Name"
+            value={user?.full_name}
+            onClick={() => openEdit('full_name', 'Full Name', user?.full_name || '')}
+          />
+          <SettingsRow
+            icon={Mail}
+            label="Email Address"
+            value={user?.email}
+            onClick={() => openEdit('email', 'Email', user?.email || '')}
+          />
+          <SettingsRow
+            icon={Phone}
+            label="Phone Number"
+            value={profileFields.phone}
+            onClick={() => openEdit('phone', 'Phone Number', profileFields.phone)}
+          />
+          <SettingsRow
+            icon={Calendar}
+            label="Date of Birth"
+            value={profileFields.dob}
+            onClick={() => openEdit('date_of_birth', 'Date of Birth', profileFields.dob)}
+          />
+          <SettingsRow
+            icon={MapPin}
+            label="Address"
+            value={profileFields.address}
+            onClick={() => openEdit('address', 'Address', profileFields.address)}
+          />
+          <SettingsRow
+            icon={Globe2}
+            label="Country"
+            value={profileFields.country}
+            onClick={() => openEdit('country', 'Country', profileFields.country)}
+          />
         </SettingsSection>
 
         <SettingsSection title="Security">
-          <SettingsRow icon={KeyRound} label="Change Password" value="Last changed —"
-            onClick={() => { setError(''); setShowPasswordModal(true); }} />
-          <SettingsRow icon={Lock} label="Transaction PIN" value="Not set"
-            onClick={() => { setSuccess('Transaction PIN feature coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
-          <SettingsRow icon={ShieldCheck} label="Two-Factor Authentication"
+          <SettingsRow
+            icon={KeyRound}
+            label="Change Password"
+            value="Last changed —"
+            onClick={() => {
+              setError('');
+              setShowPasswordModal(true);
+            }}
+          />
+          <SettingsRow
+            icon={Lock}
+            label="Transaction PIN"
+            value="Not set"
+            onClick={() => {
+              setSuccess('Transaction PIN feature coming soon.');
+              setTimeout(() => setSuccess(''), 3000);
+            }}
+          />
+          <SettingsRow
+            icon={ShieldCheck}
+            label="Two-Factor Authentication"
             value="Email code required at every sign-in"
-            trailing={<SettingsToggle enabled={false} onChange={() => { setSuccess('2FA setup coming soon.'); setTimeout(() => setSuccess(''), 3000); }} label="Toggle 2FA" />} />
-          <SettingsRow icon={Smartphone} label="Active Sessions" value="1 device"
-            onClick={() => { setSuccess('Session management coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
-          <SettingsRow icon={Bell} label="Login Alerts" value={loginAlerts ? 'On' : 'Off'}
-            trailing={<SettingsToggle enabled={loginAlerts} onChange={setLoginAlerts} label="Toggle login alerts" />} />
+          />
+          <SettingsRow
+            icon={Smartphone}
+            label="Active Sessions"
+            value={sessionsLoading ? 'Loading…' : 'Manage devices'}
+            onClick={() => {
+              void loadSessions();
+            }}
+          />
+          <SettingsRow
+            icon={LogOut}
+            label="Sign out everywhere"
+            value="End all sessions"
+            onClick={() => {
+              void handleSignOutEverywhere();
+            }}
+          />
+          <SettingsRow
+            icon={Bell}
+            label="Login Alerts"
+            value={notifLogin ? 'On' : 'Off'}
+            trailing={
+              <SettingsToggle
+                enabled={notifLogin}
+                onChange={(v) => {
+                  setNotifLogin(v);
+                  void savePref('notify_login', v);
+                }}
+                label="Toggle login alerts"
+              />
+            }
+          />
         </SettingsSection>
 
         <SettingsSection title="Account Limits">
@@ -145,81 +342,219 @@ export default function ProfilePage() {
         </SettingsSection>
 
         <SettingsSection title="Preferences">
-          <SettingsRow icon={Bell} label="Push Notifications" value={notifEnabled ? 'Enabled' : 'Disabled'}
-            trailing={<SettingsToggle enabled={notifEnabled} onChange={setNotifEnabled} label="Toggle notifications" />} />
-          <SettingsRow icon={Languages} label="Language" value="English"
-            onClick={() => { setSuccess('Language settings coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
-          <SettingsRow icon={LayoutGrid} label="Default Currency" value="GBP — British Pound"
-            onClick={() => { setSuccess('Currency preference coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
+          <SettingsRow
+            icon={Bell}
+            label="Transfer alerts"
+            value={notifTransfers ? 'On' : 'Off'}
+            trailing={
+              <SettingsToggle
+                enabled={notifTransfers}
+                onChange={(v) => {
+                  setNotifTransfers(v);
+                  void savePref('notify_transfers', v);
+                }}
+                label="Toggle transfer alerts"
+              />
+            }
+          />
+          <SettingsRow
+            icon={Bell}
+            label="Deposit alerts"
+            value={notifDeposits ? 'On' : 'Off'}
+            trailing={
+              <SettingsToggle
+                enabled={notifDeposits}
+                onChange={(v) => {
+                  setNotifDeposits(v);
+                  void savePref('notify_deposits', v);
+                }}
+                label="Toggle deposit alerts"
+              />
+            }
+          />
+          <SettingsRow icon={Landmark} label="Default Currency" value="GBP" />
+          <SettingsRow icon={Globe2} label="Language" value="English" />
         </SettingsSection>
 
-        <SettingsSection title="Support">
-          <SettingsRow icon={HelpCircle} label="Help Centre"
-            onClick={() => { setSuccess('Help centre coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
-          <SettingsRow icon={LifeBuoy} label="Contact Support" value="support@rubiconcapital.org" />
-        </SettingsSection>
-
-        <SettingsSection title="Legal">
+        <SettingsSection title="Support & Legal">
+          <SettingsRow
+            icon={LifeBuoy}
+            label="Contact Support"
+            value="support@rubiconcapital.org"
+            onClick={() => {
+              window.location.href = 'mailto:support@rubiconcapital.org';
+            }}
+          />
+          <SettingsRow icon={HelpCircle} label="Help Centre" value="FAQs & guides" onClick={() => navigate('/disclosures')} />
           <SettingsRow icon={FileText} label="Terms of Service" onClick={() => navigate('/terms')} />
           <SettingsRow icon={Scale} label="Privacy Policy" onClick={() => navigate('/privacy')} />
-          <SettingsRow icon={Landmark} label="Disclosures" onClick={() => navigate('/disclosures')} />
+          <SettingsRow icon={Info} label="Disclosures" onClick={() => navigate('/disclosures')} />
         </SettingsSection>
 
-        <div className="text-center pt-2 pb-4">
-          <p className="text-micro text-content-muted">Rubicon Capital v1.0.0</p>
-          <p className="text-micro text-content-muted mt-0.5">© {new Date().getFullYear()} Rubicon Capital Ltd.</p>
-        </div>
-
-        <Button variant="danger" fullWidth size="lg" onClick={signOut} leftIcon={<LogOut className="w-4 h-4" />}>
-          Sign Out
+        <Button variant="secondary" className="w-full" onClick={signOut}>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign out
         </Button>
       </main>
 
       <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title={`Edit ${editLabel}`}>
         <div className="space-y-4">
-          {error && <div className="text-sm text-red-400">{error}</div>}
-          <Input label={editLabel} value={editValue} onChange={e => setEditValue(e.target.value)}
-            placeholder={`Enter your ${editLabel.toLowerCase()}`} />
+          <Input
+            label={editLabel}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            placeholder={`Enter your ${editLabel.toLowerCase()}`}
+          />
         </div>
         <div className="mt-6 flex gap-3">
-          <Button variant="secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
-          <Button onClick={handleSaveProfile} loading={busy} loadingLabel="Saving…" fullWidth>Save</Button>
+          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveProfile} loading={busy} loadingLabel="Saving…" fullWidth>
+            Save
+          </Button>
         </div>
       </Modal>
 
-      <Modal open={showPasswordModal} onClose={() => { setShowPasswordModal(false); setError(''); }}
-        title="Change Password" description="Enter your current password and choose a new one.">
+      <Modal
+        open={showPasswordModal}
+        onClose={() => {
+          setShowPasswordModal(false);
+          setError('');
+        }}
+        title="Change Password"
+        description="Enter your current password and choose a new one."
+      >
         <div className="space-y-4">
           {error && <div className="text-sm text-red-400">{error}</div>}
-          <Input label="Current Password" type="password" revealable value={currentPw}
-            onChange={e => setCurrentPw(e.target.value)} placeholder="••••••••" />
-          <Input label="New Password" type="password" revealable value={newPw}
-            onChange={e => setNewPw(e.target.value)} placeholder="At least 8 characters"
-            hint="Use a mix of letters, numbers, and symbols." />
-          <Input label="Confirm New Password" type="password" revealable value={confirmPw}
-            onChange={e => setConfirmPw(e.target.value)} placeholder="••••••••" />
+          <Input
+            label="Current Password"
+            type="password"
+            revealable
+            value={currentPw}
+            onChange={(e) => setCurrentPw(e.target.value)}
+            placeholder="••••••••"
+          />
+          <Input
+            label="New Password"
+            type="password"
+            revealable
+            value={newPw}
+            onChange={(e) => setNewPw(e.target.value)}
+            placeholder="At least 8 characters"
+            hint="Use a mix of letters, numbers, and symbols."
+          />
+          <Input
+            label="Confirm New Password"
+            type="password"
+            revealable
+            value={confirmPw}
+            onChange={(e) => setConfirmPw(e.target.value)}
+            placeholder="••••••••"
+          />
         </div>
         <div className="mt-6 flex gap-3">
-          <Button variant="secondary" onClick={() => { setShowPasswordModal(false); setError(''); }}>Cancel</Button>
-          <Button onClick={handlePasswordChange} loading={busy} loadingLabel="Updating…" fullWidth>Update Password</Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowPasswordModal(false);
+              setError('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handlePasswordChange} loading={busy} loadingLabel="Updating…" fullWidth>
+            Update Password
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={showSessionsModal} onClose={() => setShowSessionsModal(false)} title="Active sessions">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          <p className="text-caption text-content-muted">
+            Devices signed in to your Rubicon account. End a session to require a new sign-in on that device.
+          </p>
+          {sessions.length === 0 ? (
+            <p className="text-sm text-content-muted py-4 text-center">
+              No session history yet. Sign in again to start tracking devices.
+            </p>
+          ) : (
+            sessions.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-start justify-between gap-3 rounded-control border border-line-subtle px-3 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-content-primary">
+                    {s.device}
+                    {s.current ? ' · This device' : ''}
+                    {s.revoked ? ' · Ended' : ''}
+                  </p>
+                  <p className="text-caption text-content-muted truncate">
+                    {s.ip || 'IP unknown'}
+                    {s.last_seen_at
+                      ? ` · Last active ${new Date(s.last_seen_at).toLocaleString('en-GB')}`
+                      : ''}
+                  </p>
+                </div>
+                {!s.revoked && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void handleRevokeSession(s.id, !!s.current)}
+                  >
+                    End
+                  </Button>
+                )}
+              </div>
+            ))
+          )}
+          <Button
+            variant="secondary"
+            className="w-full"
+            disabled={busy}
+            onClick={() => void handleSignOutEverywhere()}
+          >
+            Sign out everywhere
+          </Button>
         </div>
       </Modal>
     </div>
   );
 }
 
-function LimitBar({ label, used, total, currency }: { label: string; used: number; total: number; currency: string }) {
+function LimitBar({
+  label,
+  used,
+  total,
+  currency,
+}: {
+  label: string;
+  used: number;
+  total: number;
+  currency: string;
+}) {
   const pct = total > 0 ? Math.min((used / total) * 100, 100) : 0;
   const sym = currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : '$';
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
         <span className="text-label text-content-primary">{label}</span>
-        <span className="text-caption text-content-muted">{sym}{used.toLocaleString()} / {sym}{total.toLocaleString()}</span>
+        <span className="text-caption text-content-muted">
+          {sym}
+          {used.toLocaleString()} / {sym}
+          {total.toLocaleString()}
+        </span>
       </div>
       <div className="h-2 rounded-full bg-surface-overlay/60 overflow-hidden">
-        <div className={cx('h-full rounded-full transition-all duration-slow', pct > 80 ? 'bg-red-400' : pct > 50 ? 'bg-brand-400' : 'bg-emerald-400')}
-          style={{ width: `${Math.max(pct, 2)}%` }} />
+        <div
+          className={cx(
+            'h-full rounded-full transition-all duration-slow',
+            pct > 80 ? 'bg-red-400' : pct > 50 ? 'bg-brand-400' : 'bg-emerald-400'
+          )}
+          style={{ width: `${Math.max(pct, 2)}%` }}
+        />
       </div>
     </div>
   );

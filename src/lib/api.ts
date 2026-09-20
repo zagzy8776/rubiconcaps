@@ -175,6 +175,49 @@ export const api = {
     request(`/notifications/${id}/read`, { method: 'PATCH' }),
   markAllNotificationsRead: () =>
     request('/notifications/read-all', { method: 'POST' }),
+
+  getSessions: () => request('/sessions'),
+  revokeSession: (id: string) =>
+    request(`/sessions/${id}/revoke`, { method: 'POST' }),
+  revokeAllSessions: () =>
+    request('/sessions/revoke-all', { method: 'POST' }),
+
+  getPreferences: () => request('/profile/preferences'),
+  updatePreferences: (body: {
+    notify_login?: boolean;
+    notify_transfers?: boolean;
+    notify_deposits?: boolean;
+    notify_marketing?: boolean;
+  }) => request('/profile/preferences', { method: 'PATCH', body: JSON.stringify(body) }),
+
+  downloadStatementPdf: async (accountId: string, params?: { from?: string; to?: string }) => {
+    const token = getToken();
+    const q = new URLSearchParams();
+    if (params?.from) q.set('from', params.from);
+    if (params?.to) q.set('to', params.to);
+    const qs = q.toString();
+    const res = await fetch(
+      `${API}/accounts/${accountId}/statement.pdf${qs ? `?${qs}` : ''}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as any).error || `Download failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const disp = res.headers.get('Content-Disposition') || '';
+    const match = /filename="?([^";]+)"?/.exec(disp);
+    const filename = match?.[1] || `rubicon-statement.pdf`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return { ok: true, filename };
+  },
 };
 
 export function formatMoney(amount: number | string, currency = 'USD') {

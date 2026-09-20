@@ -167,4 +167,30 @@ export async function runMigrations() {
   `).catch(() => {});
 
   console.log('Database migrations complete.');
+
+  // Preferences + session version
+  for (const [col, type] of [
+    ['session_version', 'INTEGER NOT NULL DEFAULT 1'],
+    ['notify_login', 'BOOLEAN NOT NULL DEFAULT true'],
+    ['notify_transfers', 'BOOLEAN NOT NULL DEFAULT true'],
+    ['notify_deposits', 'BOOLEAN NOT NULL DEFAULT true'],
+    ['notify_marketing', 'BOOLEAN NOT NULL DEFAULT false'],
+  ]) {
+    await query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ${col} ${type}`).catch(() => {});
+  }
+
+  // User sessions (sign-out everywhere / device list)
+  await query(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      user_agent TEXT,
+      ip TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      revoked_at TIMESTAMPTZ
+    );
+  `).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);`).catch(() => {});
+  await query(`CREATE INDEX IF NOT EXISTS idx_sessions_active ON user_sessions(user_id) WHERE revoked_at IS NULL;`).catch(() => {});
 }

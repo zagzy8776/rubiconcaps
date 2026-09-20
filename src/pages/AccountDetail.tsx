@@ -11,7 +11,7 @@ import {
 } from '../components/ui';
 import {
   ArrowDownLeft, ArrowRightLeft, ArrowUpRight, CheckCircle2, Eye, EyeOff,
-  Copy, Minus, Plus, Receipt,
+  Copy, Download, Minus, Plus, Receipt,
 } from 'lucide-react';
 
 type ActionKind = 'deposit' | 'withdraw' | 'transfer';
@@ -74,6 +74,7 @@ export default function AccountDetail() {
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState('');
   const [copiedField, setCopiedField] = useState('');
+  const [downloadingStatement, setDownloadingStatement] = useState(false);
 
   const { hideBalances, toggle } = useBalanceVisibility();
 
@@ -212,6 +213,22 @@ export default function AccountDetail() {
     );
   }
 
+
+  const downloadStatement = async () => {
+    if (!account) return;
+    setDownloadingStatement(true);
+    setLoadError('');
+    try {
+      await api.downloadStatementPdf(account.id);
+      setSuccess('Statement PDF downloaded.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e: any) {
+      setLoadError(e?.message || 'Could not download statement');
+    } finally {
+      setDownloadingStatement(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface pb-16">
       <SkipLink />
@@ -231,13 +248,22 @@ export default function AccountDetail() {
           { label: titleCase(account.account_name || `${account.currency} Account`) },
         ]}
         actions={
-          <IconButton
-            label={hideBalances ? 'Show balance' : 'Hide balance'}
-            aria-pressed={hideBalances}
-            onClick={toggle}
-          >
-            {hideBalances ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-          </IconButton>
+          <div className="flex items-center gap-1">
+            <IconButton
+              label="Download statement PDF"
+              onClick={() => void downloadStatement()}
+              disabled={downloadingStatement || !account}
+            >
+              <Download className="w-5 h-5" />
+            </IconButton>
+            <IconButton
+              label={hideBalances ? 'Show balance' : 'Hide balance'}
+              aria-pressed={hideBalances}
+              onClick={toggle}
+            >
+              {hideBalances ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+            </IconButton>
+          </div>
         }
       />
 
