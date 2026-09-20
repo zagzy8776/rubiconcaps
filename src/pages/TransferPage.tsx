@@ -78,6 +78,7 @@ export default function TransferPage() {
   const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState('');
   const [copied, setCopied] = useState(false);
+  const [modalStep, setModalStep] = useState<'form' | 'review'>('form');
 
   const load = useCallback(async () => {
     setError('');
@@ -134,22 +135,18 @@ export default function TransferPage() {
   const openSend = () => {
     if (!fromAccount && usableAccounts[0]) setFromAccount(usableAccounts[0].id);
     setFormError('');
+    setModalStep('form');
     setShowModal(true);
   };
 
-  const copyId = async (id: string) => {
-    try {
-      await navigator.clipboard.writeText(id);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
+  const closeSendModal = () => {
+    setShowModal(false);
+    setModalStep('form');
+    setFormError('');
   };
 
-  const handleTransfer = async () => {
+  const goToReview = () => {
     setFormError('');
-    setSuccess('');
     if (!fromAccount) {
       setFormError('Select a sender account');
       return;
@@ -167,6 +164,22 @@ export default function TransferPage() {
       setFormError(`Insufficient balance. Available: ${formatMoney(avail, sel?.currency || primaryCurrency)}`);
       return;
     }
+    setModalStep('review');
+  };
+
+  const copyId = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleTransfer = async () => {
+    setFormError('');
+    setSuccess('');
     setBusy(true);
     try {
       const cleaned = toNumber.trim().replace(/\s+/g, '');
@@ -179,13 +192,14 @@ export default function TransferPage() {
       setSuccess(
         `Transfer of ${formatMoney(parseFloat(amount), sel?.currency || primaryCurrency)} to ${cleaned} was successful!`,
       );
-      setShowModal(false);
+      closeSendModal();
       setToNumber('');
       setAmount('');
       setReference('');
       await load();
     } catch (e: any) {
       setFormError(e?.message || 'Transfer failed');
+      setModalStep('form');
     } finally {
       setBusy(false);
     }
@@ -455,15 +469,35 @@ export default function TransferPage() {
 
         <Modal
           open={showModal}
-          onClose={() => {
-            setShowModal(false);
-            setFormError('');
-          }}
-          title="Send Money"
-          description="Send to a Rubicon account in the same currency."
+          onClose={closeSendModal}
+          title={modalStep === 'review' ? 'Review transfer' : 'Send Money'}
+          description={
+            modalStep === 'review'
+              ? 'Confirm the details before the payment is sent.'
+              : 'Send to a Rubicon account in the same currency.'
+          }
         >
           <div className="space-y-4">
             {formError && <Alert tone="error">{formError}</Alert>}
+            {modalStep === 'review' ? (
+              <div className="rounded-card border border-line-subtle bg-surface-raised/40 px-4 py-2">
+                <DetailRow label="From" value={sel ? `${sel.account_name || sel.currency} · ${sel.account_number}` : '—'} mono />
+                <DetailRow label="To account" value={toNumber.trim().replace(/\s+/g, '')} mono />
+                <DetailRow
+                  label="Amount"
+                  value={formatMoney(parseFloat(amount) || 0, sel?.currency || primaryCurrency)}
+                />
+                {reference.trim() && <DetailRow label="Reference" value={reference.trim()} />}
+                <DetailRow
+                  label="Balance after"
+                  value={formatMoney(
+                    (parseFloat(sel?.balance || '0') || 0) - (parseFloat(amount) || 0),
+                    sel?.currency || primaryCurrency,
+                  )}
+                />
+              </div>
+            ) : (
+              <>
 
             <div className="rounded-card border border-line-subtle bg-surface-raised/30 p-3 space-y-3">
               <p className="text-caption text-content-muted flex items-center gap-1.5">
@@ -542,14 +576,29 @@ export default function TransferPage() {
               hint="Shown on both statements"
               maxLength={80}
             />
+              </>
+            )}
           </div>
           <div className="mt-6 flex gap-3">
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleTransfer} loading={busy} loadingLabel="Sending…" fullWidth>
-              Confirm Transfer
-            </Button>
+            {modalStep === 'review' ? (
+              <>
+                <Button variant="secondary" onClick={() => setModalStep('form')} disabled={busy}>
+                  Edit
+                </Button>
+                <Button onClick={handleTransfer} loading={busy} loadingLabel="Sending…" fullWidth>
+                  Confirm &amp; send
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={closeSendModal}>
+                  Cancel
+                </Button>
+                <Button onClick={goToReview} fullWidth>
+                  Review transfer
+                </Button>
+              </>
+            )}
           </div>
         </Modal>
       </main>

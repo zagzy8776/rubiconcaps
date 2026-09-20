@@ -88,7 +88,7 @@ export default function ProfilePage() {
               <p className="text-caption text-content-muted truncate">{user?.email}</p>
               <div className="flex items-center gap-2 mt-2">
                 <StatusBadge status={user?.is_locked ? 'locked' : 'active'} />
-                <Badge tone="brand" dot>Verified</Badge>
+                <Badge tone="neutral" dot>Email on file</Badge>
               </div>
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function ProfilePage() {
           <SettingsRow icon={Lock} label="Transaction PIN" value="Not set"
             onClick={() => { setSuccess('Transaction PIN feature coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
           <SettingsRow icon={ShieldCheck} label="Two-Factor Authentication"
-            value="Add extra security to your account"
+            value="Email code required at every sign-in"
             trailing={<SettingsToggle enabled={false} onChange={() => { setSuccess('2FA setup coming soon.'); setTimeout(() => setSuccess(''), 3000); }} label="Toggle 2FA" />} />
           <SettingsRow icon={Smartphone} label="Active Sessions" value="1 device"
             onClick={() => { setSuccess('Session management coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
@@ -156,7 +156,7 @@ export default function ProfilePage() {
         <SettingsSection title="Support">
           <SettingsRow icon={HelpCircle} label="Help Centre"
             onClick={() => { setSuccess('Help centre coming soon.'); setTimeout(() => setSuccess(''), 3000); }} />
-          <SettingsRow icon={LifeBuoy} label="Contact Support" value="+44 (0) 20 7946 0958" />
+          <SettingsRow icon={LifeBuoy} label="Contact Support" value="support@rubiconcapital.org" />
         </SettingsSection>
 
         <SettingsSection title="Legal">

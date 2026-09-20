@@ -47,7 +47,7 @@ app.use(cronRoutes);
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, full_name } = req.body;
+    const { email, password, full_name, phone, date_of_birth, address, country } = req.body || {};
     if (!email || !password || !full_name) return res.status(400).json({ error: 'Email, password and full name are required' });
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     const existing = await query('SELECT id FROM profiles WHERE email = $1', [email.toLowerCase()]);
@@ -56,8 +56,19 @@ app.post('/api/auth/register', async (req, res) => {
     const OWNER_EMAIL = (process.env.OWNER_EMAIL || '').toLowerCase();
     const role = email.toLowerCase() === OWNER_EMAIL ? 'admin' : 'user';
     const { rows } = await query(
-      `INSERT INTO profiles (email, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, full_name, role, created_at`,
-      [email.toLowerCase(), password_hash, full_name, role]
+      `INSERT INTO profiles (email, password_hash, full_name, role, phone, date_of_birth, address, country)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, email, full_name, role, phone, created_at`,
+      [
+        email.toLowerCase(),
+        password_hash,
+        String(full_name).trim(),
+        role,
+        phone ? String(phone).trim() : null,
+        date_of_birth || null,
+        address ? String(address).trim() : null,
+        country ? String(country).trim() : 'GB',
+      ]
     );
     const user = rows[0];
     const token = signToken(user);

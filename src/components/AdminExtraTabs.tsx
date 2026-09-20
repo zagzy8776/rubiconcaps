@@ -12,12 +12,14 @@ type Props = {
   users: any[];
   accounts: any[];
   depositRequests: any[];
+  withdrawalRequests: any[];
   cryptoAccounts: any[];
   auditLogs: any[];
   activity: any[];
   toggleUserLock: (id: string, locked: boolean) => void;
   handleAccountStatus: (id: string, action: string) => void;
   handleDepositReview: (id: string, status: 'approved' | 'rejected') => void;
+  handleWithdrawalReview: (id: string, status: 'approved' | 'rejected') => void;
   handleCryptoReview: (id: string, status: 'active' | 'rejected' | 'suspended') => void;
   handleCryptoAdjust: (id: string, amount: number, reason?: string) => void;
   openCredit: (a: any) => void;
@@ -27,8 +29,8 @@ type Props = {
 
 export function AdminExtraTabs(p: Props) {
   const {
-    tab, users, accounts, depositRequests, cryptoAccounts, auditLogs, activity,
-    toggleUserLock, handleAccountStatus, handleDepositReview, handleCryptoReview,
+    tab, users, accounts, depositRequests, withdrawalRequests, cryptoAccounts, auditLogs, activity,
+    toggleUserLock, handleAccountStatus, handleDepositReview, handleWithdrawalReview, handleCryptoReview,
     handleCryptoAdjust, openCredit, openDebit, openCreate,
   } = p;
 
@@ -118,6 +120,39 @@ export function AdminExtraTabs(p: Props) {
                   </div>
                 ) : (
                   <Badge>{d.status}</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  if (tab === 'withdrawals') {
+    return (
+      <div className="animate-fade-in">
+        <SectionHeading title="Withdrawal requests" icon={ClipboardList} />
+        {withdrawalRequests.length === 0 ? (
+          <EmptyState icon={ClipboardList} title="No withdrawal requests" description="Client withdrawal requests appear here for approval." />
+        ) : (
+          <ul className="space-y-2">
+            {withdrawalRequests.map((w: any) => (
+              <li key={w.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line-subtle bg-surface-raised/40 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{w.customer_name || w.customer_email || 'Client'}</p>
+                  <p className="text-caption text-content-muted">
+                    {formatMoney(w.amount, w.currency)} · {w.account_number || '—'} · {w.status}
+                    {w.destination ? ` · ${w.destination}` : ''}
+                  </p>
+                </div>
+                {w.status === 'pending' ? (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="success" onClick={() => handleWithdrawalReview(w.id, 'approved')}>Approve</Button>
+                    <Button size="sm" variant="danger" onClick={() => handleWithdrawalReview(w.id, 'rejected')}>Reject</Button>
+                  </div>
+                ) : (
+                  <Badge>{w.status}</Badge>
                 )}
               </li>
             ))}

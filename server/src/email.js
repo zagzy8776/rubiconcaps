@@ -401,4 +401,3 @@ export function voidEmail(promise) {
     console.error('[email] async error:', err?.message || err)
   );
 }
-export const voidEmail = voidEmail;

@@ -7,13 +7,14 @@ import {
   ScrollText, Users, Wallet, ArrowLeftRight,
 } from 'lucide-react';
 
-type AdminTab = 'overview' | 'users' | 'accounts' | 'deposits' | 'crypto' | 'transactions' | 'audit' | 'activity';
+type AdminTab = 'overview' | 'users' | 'accounts' | 'deposits' | 'withdrawals' | 'crypto' | 'transactions' | 'audit' | 'activity';
 
 const NAV_ITEMS: { id: AdminTab; label: string; icon: typeof Shield }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'users', label: 'Customers', icon: Users },
   { id: 'accounts', label: 'Accounts', icon: Wallet },
   { id: 'deposits', label: 'Deposits', icon: ClipboardList },
+  { id: 'withdrawals', label: 'Withdrawals', icon: ClipboardList },
   { id: 'crypto', label: 'Crypto', icon: Coins },
   { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
   { id: 'audit', label: 'Audit Log', icon: ScrollText },

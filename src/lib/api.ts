@@ -43,9 +43,16 @@ async function adminRequest(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  register: (body: { email: string; password: string; full_name: string }) =>
-    request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  login: (body: { email: string; password: string }) =>
+  register: (body: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone?: string;
+    date_of_birth?: string;
+    address?: string;
+    country?: string;
+  }) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  login: (body: { email: string; password: string; trust_device?: boolean }) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   verifyOtp: (body: { challenge_id: string; code: string }) =>
     request('/auth/verify-otp', { method: 'POST', body: JSON.stringify(body) }),

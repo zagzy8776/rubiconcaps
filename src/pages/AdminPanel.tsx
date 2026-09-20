@@ -34,6 +34,7 @@ export default function AdminPanel() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [depositRequests, setDepositRequests] = useState<any[]>([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [cryptoAccounts, setCryptoAccounts] = useState<any[]>([]);
 
@@ -67,6 +68,8 @@ export default function AdminPanel() {
         setActivity((await api.adminActivity()).activity ?? []);
       } else if (target === 'deposits') {
         try { setDepositRequests((await api.adminDeposits()).deposits ?? []); } catch { setDepositRequests([]); }
+      } else if (target === 'withdrawals') {
+        try { setWithdrawalRequests((await api.adminWithdrawals('all')).withdrawals ?? []); } catch { setWithdrawalRequests([]); }
       } else if (target === 'audit') {
         try { setAuditLogs((await api.getAuditLogs()).audit_logs ?? []); } catch { setAuditLogs([]); }
       } else if (target === 'crypto') {
@@ -114,6 +117,17 @@ export default function AdminPanel() {
       await loadTab('deposits');
     } catch (e: any) {
       setActionError(e?.message || 'Review failed');
+    } finally { setBusy(false); }
+  };
+
+  const handleWithdrawalReview = async (id: string, status: 'approved' | 'rejected') => {
+    setBusy(true); setActionError('');
+    try {
+      await api.reviewWithdrawal(id, { status });
+      setNotice(`Withdrawal ${status}.`);
+      await loadTab('withdrawals');
+    } catch (e: any) {
+      setActionError(e?.message || 'Withdrawal review failed');
     } finally { setBusy(false); }
   };
 
@@ -268,12 +282,14 @@ export default function AdminPanel() {
             users={users}
             accounts={accounts}
             depositRequests={depositRequests}
+            withdrawalRequests={withdrawalRequests}
             cryptoAccounts={cryptoAccounts}
             auditLogs={auditLogs}
             activity={activity}
             toggleUserLock={toggleUserLock}
             handleAccountStatus={handleAccountStatus}
             handleDepositReview={handleDepositReview}
+            handleWithdrawalReview={handleWithdrawalReview}
             handleCryptoReview={handleCryptoReview}
             handleCryptoAdjust={handleCryptoAdjust}
             openCredit={(a) => { setAdjustAccountId(a.id); setAdjustType('credit'); setAdjustAmount(''); setShowAdjust(true); }}

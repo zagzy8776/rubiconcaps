@@ -11,7 +11,7 @@ import {
 } from '../components/ui';
 import {
   ArrowDownLeft, ArrowRightLeft, ArrowUpRight, CheckCircle2, Eye, EyeOff,
-  Minus, Plus, Receipt,
+  Copy, Minus, Plus, Receipt,
 } from 'lucide-react';
 
 type ActionKind = 'deposit' | 'withdraw' | 'transfer';
@@ -24,6 +24,7 @@ interface Account {
   balance: string;
   status: string;
   is_locked: boolean;
+  routing_number?: string;
 }
 
 interface Transaction {
@@ -72,8 +73,24 @@ export default function AccountDetail() {
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState('');
+  const [copiedField, setCopiedField] = useState('');
 
   const { hideBalances, toggle } = useBalanceVisibility();
+
+  const routingLabel = (currency?: string) => {
+    if (currency === 'GBP') return 'Sort code';
+    if (currency === 'USD') return 'Routing number';
+    if (currency === 'EUR') return 'Bank code';
+    return 'Routing number';
+  };
+
+  const copyText = async (value: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(''), 2000);
+    } catch { /* ignore */ }
+  };
 
   const load = useCallback(async () => {
     setLoadError('');
@@ -138,7 +155,11 @@ export default function AccountDetail() {
       if (modal === 'deposit') {
         await api.deposit({ account_id: id, amount, description: desc, reference: desc });
       } else if (modal === 'withdraw') {
-        throw new Error('Withdrawals must be arranged with client services. Use Transfer to move money between your accounts.');
+        await api.createWithdrawal({
+          account_id: id,
+          amount: parseFloat(String(amount)),
+          reference: desc || undefined,
+        });
       } else {
         await api.transfer({ from_account_id: id, to_account_id: toAccount, amount, description: desc });
       }
@@ -146,7 +167,9 @@ export default function AccountDetail() {
       setSuccess(
         modal === 'deposit'
           ? `Deposit request for ${formatted} submitted. Funds appear after admin approval.`
-          : `${formatted} transferred successfully.`,
+          : modal === 'withdraw'
+            ? `Withdrawal request for ${formatted} submitted. An admin will review it shortly.`
+            : `${formatted} transferred successfully.`,
       );
       closeModal();
       await load();
@@ -196,8 +219,8 @@ export default function AccountDetail() {
       <PageHeader
         title={titleCase(account.account_name || `${account.currency} Account`)}
         subtitle={
-          <span className="flex items-center gap-2">
-            <span className="font-mono">{maskAccountNumber(account.account_number)}</span>
+          <span className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono tracking-wide">{account.account_number}</span>
             <Badge tone="neutral">{account.currency}</Badge>
           </span>
         }
@@ -301,6 +324,51 @@ export default function AccountDetail() {
               </p>
             )}
           </div>
+        </Card>
+
+        <Card className="p-5 sm:p-6 mb-8">
+          <p className="text-label text-content-secondary mb-4">Account details</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-caption text-content-muted mb-1">Account number</p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm tracking-wide">{account.account_number}</span>
+                <button
+                  type="button"
+                  onClick={() => copyText(account.account_number, 'account')}
+                  className="text-caption text-amber-400 hover:text-amber-300 inline-flex items-center gap-1"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedField === 'account' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+            <div>
+              <p className="text-caption text-content-muted mb-1">{routingLabel(account.currency)}</p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm tracking-wide">
+                  {account.routing_number || (account.currency === 'GBP' ? '04-00-26' : account.currency === 'USD' ? '026009593' : '20041000')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyText(
+                      account.routing_number ||
+                        (account.currency === 'GBP' ? '04-00-26' : account.currency === 'USD' ? '026009593' : '20041000'),
+                      'routing',
+                    )
+                  }
+                  className="text-caption text-amber-400 hover:text-amber-300 inline-flex items-center gap-1"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedField === 'routing' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <p className="mt-4 text-caption text-content-muted">
+            Bank: Rubicon Capital · Use these details for same-currency transfers on the platform.
+          </p>
         </Card>
 
         <section className="mt-10" aria-labelledby="activity-heading">
