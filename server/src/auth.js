@@ -31,7 +31,6 @@ export async function comparePassword(password, hash) {
   return bcrypt.compare(password, hash);
 }
 
-/** Create a tracked session row and return claims to embed in the JWT. */
 export async function createSession(userId, req) {
   const id = crypto.randomUUID();
   const ua = String(req?.headers?.['user-agent'] || '').slice(0, 400);
@@ -67,7 +66,6 @@ export async function authMiddleware(req, res, next) {
   try {
     const payload = verifyToken(header.slice(7));
 
-    // Sign-out-everywhere: reject tokens with stale session_version
     if (payload.sv != null && payload.id) {
       try {
         const { rows } = await query(
@@ -82,7 +80,6 @@ export async function authMiddleware(req, res, next) {
       }
     }
 
-    // Per-device revoke
     if (payload.sid && payload.id) {
       try {
         const { rows } = await query(
@@ -119,7 +116,8 @@ export function adminMiddleware(req, res, next) {
 
 export async function getProfile(userId) {
   const { rows } = await query(
-    `SELECT id, email, full_name, role, is_locked, phone, created_at, last_login,
+    `SELECT id, email, full_name, role, is_locked, phone, address, country, date_of_birth,
+            kyc_status, account_status, created_at, last_login,
             notify_login, notify_transfers, notify_deposits, notify_marketing,
             COALESCE(session_version, 1) AS session_version
      FROM profiles WHERE id = $1`,

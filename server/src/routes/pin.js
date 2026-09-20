@@ -1,101 +1,117 @@
-/**
- * Transaction PIN — set, change, status, verify.
- */
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { query } from '../db.js';
-import { authMiddleware, hashPassword, comparePassword } from '../auth.js';
+import { authMiddleware, getProfile } from '../auth.js';
 
 const router = Router();
 
-function normalizePin(pin) {
-  const p = String(pin || '').replace(/\s/g, '');
-  if (!/^\d{4,6}$/.test(p)) return null;
-  return p;
-}
-
-// GET /api/profile/pin-status
 router.get('/api/profile/pin-status', authMiddleware, async (req, res) => {
   try {
-    const { rows } = await query(
-      `SELECT transaction_pin_hash IS NOT NULL AS has_pin FROM profiles WHERE id = $1`,
-      [req.user.id]
-    );
-    res.json({ has_pin: !!rows[0]?.has_pin });
+    const { rows } = await query(`SELECT transaction_pin_hash FROM profiles WHERE id = $1`, [req.user.id]);
+    res.json({ has_pin: Boolean(rows[0]?.transaction_pin_hash) });
   } catch (err) {
-    console.error('pin-status:', err);
-    res.status(500).json({ error: 'Failed to check PIN status' });
+    res.json({ has_pin: false });
   }
 });
 
-// POST /api/profile/pin — set or change (requires current_pin if already set)
 router.post('/api/profile/pin', authMiddleware, async (req, res) => {
   try {
-    const pin = normalizePin(req.body?.pin);
-    if (!pin) {
-      return res.status(400).json({ error: 'PIN must be 4–6 digits' });
-    }
-    const { rows } = await query(
-      `SELECT transaction_pin_hash FROM profiles WHERE id = $1`,
-      [req.user.id]
-    );
-    if (!rows[0]) return res.status(404).json({ error: 'Profile not found' });
-
-    const existing = rows[0].transaction_pin_hash;
+    const pin = String(req.body?.pin || '');
+    if (!/^\d{4,6}$/.test(pin)) return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+    const { rows } = await query(`SELECT transaction_pin_hash FROM profiles WHERE id = $1`, [req.user.id]);
+    const existing = rows[0]?.transaction_pin_hash;
     if (existing) {
-      const current = normalizePin(req.body?.current_pin);
-      if (!current) {
-        return res.status(400).json({ error: 'Current PIN required to change it' });
-      }
-      const ok = await comparePassword(current, existing);
-      if (!ok) return res.status(401).json({ error: 'Current PIN is incorrect' });
+      const current = String(req.body?.current_pin || '');
+      const ok = await bcrypt.compare(current, existing);
+      if (!ok) return res.status(400).json({ error: 'Current PIN is incorrect' });
     }
-
-    const hash = await hashPassword(pin);
+    const hash = await bcrypt.hash(pin, 10);
     await query(`UPDATE profiles SET transaction_pin_hash = $1 WHERE id = $2`, [hash, req.user.id]);
-    res.json({ success: true, has_pin: true });
-  } catch (err) {
-    console.error('set pin:', err);
-    res.status(500).json({ error: 'Failed to set PIN' });
-  }
-});
-
-// POST /api/profile/pin/verify
-router.post('/api/profile/pin/verify', authMiddleware, async (req, res) => {
-  try {
-    const pin = normalizePin(req.body?.pin);
-    if (!pin) return res.status(400).json({ error: 'Enter your 4–6 digit PIN' });
-    const { rows } = await query(
-      `SELECT transaction_pin_hash FROM profiles WHERE id = $1`,
-      [req.user.id]
-    );
-    if (!rows[0]?.transaction_pin_hash) {
-      return res.status(400).json({ error: 'No transaction PIN set. Set one in Profile first.' });
-    }
-    const ok = await comparePassword(pin, rows[0].transaction_pin_hash);
-    if (!ok) return res.status(401).json({ error: 'Incorrect PIN' });
     res.json({ success: true });
   } catch (err) {
-    console.error('verify pin:', err);
-    res.status(500).json({ error: 'PIN verification failed' });
+    res.status(500).json({ error: err.message || 'Could not save PIN' });
   }
 });
 
-/** Helper used by transfer routes */
-export async function assertTransactionPin(userId, pinRaw) {
-  const { rows } = await query(
-    `SELECT transaction_pin_hash FROM profiles WHERE id = $1`,
-    [userId]
-  );
-  const hash = rows[0]?.transaction_pin_hash;
-  if (!hash) {
-    // PIN not set — allow (user can set later). Require once set.
-    return { ok: true, required: false };
+router.post('/api/profile/pin/verify', authMiddleware, async (req, res) => {
+  try {
+    const pin = String(req.body?.pin || '');
+    const { rows } = await query(`SELECT transaction_pin_hash FROM profiles WHERE id = $1`, [req.user.id]);
+    const hash = rows[0]?.transaction_pin_hash;
+    if (!hash) return res.status(400).json({ error: 'No PIN set' });
+    const ok = await bcrypt.compare(pin, hash);
+    if (!ok) return res.status(401).json({ error: 'Incorrect PIN' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Verify failed' });
   }
-  const pin = normalizePin(pinRaw);
-  if (!pin) return { ok: false, error: 'Transaction PIN required' };
-  const match = await comparePassword(pin, hash);
-  if (!match) return { ok: false, error: 'Incorrect transaction PIN' };
-  return { ok: true, required: true };
-}
+});
+
+router.get('/api/profile/preferences', authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT notify_login, notify_transfers, notify_deposits, notify_marketing FROM profiles WHERE id = $1`,
+      [req.user.id]
+    );
+    res.json({ preferences: rows[0] || {} });
+  } catch (err) {
+    res.json({ preferences: {} });
+  }
+});
+
+router.patch('/api/profile/preferences', authMiddleware, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    for (const f of ['notify_login', 'notify_transfers', 'notify_deposits', 'notify_marketing']) {
+      if (typeof body[f] === 'boolean') {
+        sets.push(`${f} = $${i++}`);
+        vals.push(body[f]);
+      }
+    }
+    if (!sets.length) {
+      const p = await query(
+        `SELECT notify_login, notify_transfers, notify_deposits, notify_marketing FROM profiles WHERE id = $1`,
+        [req.user.id]
+      );
+      return res.json({ preferences: p.rows[0] || {} });
+    }
+    vals.push(req.user.id);
+    const { rows } = await query(
+      `UPDATE profiles SET ${sets.join(', ')} WHERE id = $${i}
+       RETURNING notify_login, notify_transfers, notify_deposits, notify_marketing`,
+      vals
+    );
+    res.json({ preferences: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not save preferences' });
+  }
+});
+
+router.patch('/api/profile', authMiddleware, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const allowed = ['full_name', 'phone', 'address', 'country', 'date_of_birth'];
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    for (const f of allowed) {
+      if (body[f] !== undefined) {
+        sets.push(`${f} = $${i++}`);
+        vals.push(body[f] === '' ? null : (typeof body[f] === 'string' ? body[f].trim() : body[f]));
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No fields to update' });
+    vals.push(req.user.id);
+    await query(`UPDATE profiles SET ${sets.join(', ')} WHERE id = $${i}`, vals);
+    const user = await getProfile(req.user.id);
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error('profile patch:', err);
+    res.status(500).json({ error: err.message || 'Could not update profile' });
+  }
+});
 
 export default router;
