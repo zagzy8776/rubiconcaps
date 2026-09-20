@@ -8,6 +8,11 @@ interface User {
   role: 'user' | 'admin';
   is_locked?: boolean;
   phone?: string;
+  address?: string;
+  country?: string;
+  date_of_birth?: string;
+  kyc_status?: string;
+  account_status?: string;
   created_at?: string;
   last_login?: string;
 }
