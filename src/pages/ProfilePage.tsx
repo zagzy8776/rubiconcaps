@@ -11,6 +11,9 @@ import {
   User, FileText, Scale, Info,
 } from 'lucide-react';
 
+const SUPPORT_WHATSAPP = '+447448216273';
+const SUPPORT_WHATSAPP_LINK = 'https://wa.me/447448216273';
+
 function getInitials(name?: string) {
   if (!name) return '?';
   return name.split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 2);
@@ -54,6 +57,8 @@ export default function ProfilePage() {
     }),
     [user],
   );
+
+  const avatarUrl = (user as any)?.avatar_url as string | undefined;
 
   useEffect(() => {
     refresh().catch(() => {});
@@ -152,8 +157,8 @@ export default function ProfilePage() {
 
         <Card className="p-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
-              {getInitials(user?.full_name)}
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xl shrink-0 overflow-hidden">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : getInitials(user?.full_name)}
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-content-primary truncate">{user?.full_name}</h2>
@@ -203,7 +208,13 @@ export default function ProfilePage() {
         </SettingsSection>
 
         <SettingsSection title="Support & Legal">
-          <SettingsRow icon={LifeBuoy} label="Contact Support" value="support@rubiconcapital.org" onClick={() => { window.location.href = 'mailto:support@rubiconcapital.org'; }} />
+          <SettingsRow
+            icon={Phone}
+            label="WhatsApp"
+            value={SUPPORT_WHATSAPP}
+            onClick={() => { window.location.href = SUPPORT_WHATSAPP_LINK; }}
+          />
+          <SettingsRow icon={LifeBuoy} label="Email support" value="support@rubiconcapital.org" onClick={() => { window.location.href = 'mailto:support@rubiconcapital.org'; }} />
           <SettingsRow icon={HelpCircle} label="Help Centre" value="FAQs & guides" onClick={() => navigate('/disclosures')} />
           <SettingsRow icon={FileText} label="Terms of Service" onClick={() => navigate('/terms')} />
           <SettingsRow icon={Scale} label="Privacy Policy" onClick={() => navigate('/privacy')} />
