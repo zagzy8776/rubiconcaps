@@ -1,5 +1,5 @@
 import { formatMoney } from '../lib/api';
-import { formatDate, maskAccountNumber, titleCase } from '../lib/format';
+import { formatDate, maskAccountNumber } from '../lib/format';
 import {
   Badge, Button, EmptyState, SectionHeading, StatusBadge,
 } from './ui';
@@ -48,7 +48,10 @@ export function AdminExtraTabs(p: Props) {
               <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line-subtle bg-surface-raised/40 px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{u.full_name || '—'}</p>
-                  <p className="text-caption text-content-muted truncate">{u.email} · {u.account_count || 0} accounts</p>
+                  <p className="text-caption text-content-muted truncate">{u.email}</p>
+                  <p className="text-caption text-content-muted truncate">
+                    {u.phone || 'No phone'} · {u.account_count || 0} accounts
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {u.is_locked ? <Badge tone="negative">Locked</Badge> : <Badge tone="positive">Active</Badge>}
