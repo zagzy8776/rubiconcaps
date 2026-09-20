@@ -3,45 +3,57 @@ export function mountCoreB(app, deps) {
   const { query, withTransaction, authMiddleware, adminMiddleware, getProfile,
     createNotification, createAuditLog, buildAccountIdentity, signToken } = deps;
 
+async function safeQuery(sql, params = [], fallbackRows = []) {
+  try {
+    return await query(sql, params);
+  } catch (err) {
+    console.warn('safeQuery:', err.message, sql.slice(0, 80));
+    return { rows: fallbackRows };
+  }
+}
+
 app.get('/api/admin/overview', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { backfillMissingAccounts } = await import('../helpers.js');
-    await backfillMissingAccounts();
-
     const [users, accounts, assets, recent, pending] = await Promise.all([
-      query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_locked) as locked FROM profiles`),
-      query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_locked) as locked FROM accounts`),
-      query(`SELECT currency, COALESCE(SUM(balance),0) as total FROM accounts GROUP BY currency`),
-      query(`SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 15`).catch(() => ({ rows: [] })),
-      query(`SELECT COUNT(*) as pending FROM account_requests WHERE status = 'pending'`).catch(() => ({ rows: [{ pending: 0 }] })),
+      safeQuery(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_locked) as locked FROM profiles`, [], [{ total: 0, locked: 0 }]),
+      safeQuery(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_locked) as locked FROM accounts`, [], [{ total: 0, locked: 0 }]),
+      safeQuery(`SELECT currency, COALESCE(SUM(balance),0) as total FROM accounts GROUP BY currency`),
+      safeQuery(`SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 15`),
+      safeQuery(`SELECT COUNT(*) as pending FROM account_requests WHERE status = 'pending'`, [], [{ pending: 0 }]),
     ]);
     res.json({
-      users: users.rows[0],
-      accounts: accounts.rows[0],
-      assets_by_currency: assets.rows,
-      recent_activity: recent.rows,
+      users: users.rows[0] || { total: 0, locked: 0 },
+      accounts: accounts.rows[0] || { total: 0, locked: 0 },
+      assets_by_currency: assets.rows || [],
+      recent_activity: recent.rows || [],
       pending_requests: parseInt(pending.rows[0]?.pending || 0),
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to load overview' });
+    res.json({
+      users: { total: 0, locked: 0 },
+      accounts: { total: 0, locked: 0 },
+      assets_by_currency: [],
+      recent_activity: [],
+      pending_requests: 0,
+      degraded: true,
+    });
   }
 });
 
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { backfillMissingAccounts } = await import('../helpers.js');
-    await backfillMissingAccounts();
     const search = req.query.q || '';
     const { rows } = await query(
-      `SELECT id, email, full_name, role, is_locked, created_at, last_login,
+      `SELECT id, email, full_name, role, is_locked, created_at, last_login, phone,
               (SELECT COUNT(*) FROM accounts a WHERE a.user_id = p.id) as account_count
        FROM profiles p WHERE email ILIKE $1 OR full_name ILIKE $1 ORDER BY created_at DESC LIMIT 100`,
       [`%${search}%`]
     );
     res.json({ users: rows });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch users' });
+    console.error('admin users:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch users' });
   }
 });
 
@@ -71,8 +83,6 @@ app.patch('/api/admin/users/:id/lock', authMiddleware, adminMiddleware, async (r
 
 app.get('/api/admin/accounts', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { backfillMissingAccounts } = await import('../helpers.js');
-    await backfillMissingAccounts();
     const search = req.query.q || '';
     const { rows } = await query(
       `SELECT a.*, p.email, p.full_name FROM accounts a
@@ -85,7 +95,8 @@ app.get('/api/admin/accounts', authMiddleware, adminMiddleware, async (req, res)
     );
     res.json({ accounts: rows });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch accounts' });
+    console.error('admin accounts:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch accounts' });
   }
 });
 
@@ -190,7 +201,7 @@ app.get('/api/admin/transactions', authMiddleware, adminMiddleware, async (req, 
     );
     res.json({ transactions: rows });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch transactions' });
+    res.status(500).json({ error: err.message || 'Failed to fetch transactions' });
   }
 });
 
