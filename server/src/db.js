@@ -24,10 +24,17 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-if (!globalForPg.__pgPool) {
-  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || undefined;
+function buildConfig() {
+  let connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  if (connectionString) {
+    connectionString = connectionString
+      .replace(/[?&]sslmode=[^&]*/gi, '')
+      .replace(/[?&]ssl=[^&]*/gi, '');
+    const join = connectionString.includes('?') ? '&' : '?';
+    connectionString = `${connectionString}${join}sslmode=no-verify`;
+  }
   const serverless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  globalForPg.__pgPool = new pg.Pool({
+  return {
     ...(connectionString
       ? { connectionString }
       : {
@@ -41,9 +48,13 @@ if (!globalForPg.__pgPool) {
     max: serverless ? 1 : 3,
     min: 0,
     idleTimeoutMillis: serverless ? 4000 : 20000,
-    connectionTimeoutMillis: 6000,
+    connectionTimeoutMillis: 8000,
     allowExitOnIdle: true,
-  });
+  };
+}
+
+if (!globalForPg.__pgPool) {
+  globalForPg.__pgPool = new pg.Pool(buildConfig());
   globalForPg.__pgPool.on('error', (err) => {
     console.error('pg pool idle client error:', err.message);
   });
@@ -64,8 +75,8 @@ export async function query(text, params) {
       return res;
     } catch (err) {
       lastErr = err;
-      if (isPoolExhausted(err) && attempt === 0) {
-        await sleep(600);
+      if ((isPoolExhausted(err) || /self-signed certificate/i.test(err.message)) && attempt === 0) {
+        await sleep(400);
         continue;
       }
       break;
@@ -86,13 +97,7 @@ export async function withTransaction(callback) {
   } catch (err) {
     if (isPoolExhausted(err)) {
       await sleep(600);
-      try {
-        client = await pool.connect();
-      } catch (err2) {
-        const clean = new Error('Database is busy. Wait a few seconds and try again.');
-        clean.status = 503;
-        throw clean;
-      }
+      client = await pool.connect();
     } else {
       throw err;
     }
