@@ -92,6 +92,55 @@ export default function ProfilePage() {
     setShowEditModal(true);
   };
 
+  
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleAvatarFile = async (file?: File | null) => {
+    if (!file) return;
+    setError('');
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose a JPEG or PNG image');
+      return;
+    }
+    if (file.size > 400_000) {
+      setError('Photo is too large. Use a smaller image (under 400KB).');
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      await api.uploadAvatar(dataUrl);
+      await refresh();
+      setSuccess('Profile photo updated.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e: any) {
+      setError(e?.message || 'Could not upload photo');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.removeAvatar();
+      await refresh();
+      setSuccess('Photo removed.');
+      setTimeout(() => setSuccess(''), 2500);
+    } catch (e: any) {
+      setError(e?.message || 'Could not remove photo');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     setBusy(true);
     setError('');
