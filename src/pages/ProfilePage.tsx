@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
-const SUPPORT_WHATSAPP = '+12136061732';
-const SUPPORT_WHATSAPP_LINK = 'https://wa.me/12136061732';
+const SUPPORT_PHONE = '+12136061732';
+const SUPPORT_PHONE_DISPLAY = '+1 (213) 606-1732';
+const SUPPORT_TEL_LINK = 'tel:+12136061732';
+const SUPPORT_SMS_LINK = 'sms:+12136061732';
 
 function getInitials(name?: string) {
   if (!name) return '?';
@@ -235,9 +237,15 @@ export default function ProfilePage() {
         <SettingsSection title="Support & Legal">
           <SettingsRow
             icon={Phone}
-            label="WhatsApp"
-            value={SUPPORT_WHATSAPP}
-            onClick={() => { window.location.href = SUPPORT_WHATSAPP_LINK; }}
+            label="Call support"
+            value={SUPPORT_PHONE_DISPLAY}
+            onClick={() => { window.location.href = SUPPORT_TEL_LINK; }}
+          />
+          <SettingsRow
+            icon={Smartphone}
+            label="Text / SMS support"
+            value={SUPPORT_PHONE_DISPLAY}
+            onClick={() => { window.location.href = SUPPORT_SMS_LINK; }}
           />
           <SettingsRow icon={LifeBuoy} label="Email support" value="rubiconcapital@rubiconcapital.org" onClick={() => { window.location.href = 'mailto:rubiconcapital@rubiconcapital.org'; }} />
           <SettingsRow icon={HelpCircle} label="Help Centre" value="FAQs & guides" onClick={() => navigate('/disclosures')} />

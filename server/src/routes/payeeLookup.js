@@ -4,7 +4,7 @@ import { authMiddleware, adminMiddleware } from '../auth.js';
 
 const router = Router();
 
-const SUPPORT_WHATSAPP = (process.env.SUPPORT_WHATSAPP || '+12136061732').replace(/\s+/g, '');
+const SUPPORT_PHONE = (process.env.SUPPORT_PHONE || process.env.SUPPORT_WHATSAPP || '+12136061732').replace(/\s+/g, '');
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'rubiconcapital@rubiconcapital.org';
 
 query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT`).catch((e) => {
@@ -12,10 +12,13 @@ query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT`).catch((e)
 });
 
 router.get('/api/support', (_req, res) => {
-  const digits = SUPPORT_WHATSAPP.replace(/[^\d]/g, '');
+  const digits = SUPPORT_PHONE.replace(/[^\d+]/g, '');
+  const e164 = digits.startsWith('+') ? digits : `+${digits.replace(/^\+/, '')}`;
   res.json({
-    whatsapp: SUPPORT_WHATSAPP,
-    whatsapp_link: `https://wa.me/${digits}`,
+    phone: SUPPORT_PHONE,
+    phone_display: '+1 (213) 606-1732',
+    tel_link: `tel:${e164.startsWith('+') ? e164 : '+'+e164}`,
+    sms_link: `sms:${e164.startsWith('+') ? e164 : '+'+e164}`,
     email: SUPPORT_EMAIL,
   });
 });
