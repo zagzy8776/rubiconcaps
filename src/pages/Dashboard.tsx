@@ -15,6 +15,7 @@ import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Clock, CreditCard, Eye, EyeOff,
   Home, Menu, Plus, Send, Wallet, TrendingUp, Coins,
 } from 'lucide-react';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { NotificationBell } from '../components/NotificationBell';
 
 const HERO_IMG =
@@ -161,6 +162,7 @@ export default function Dashboard() {
               <BrandLogo size={32} withWordmark />
             </Link>
             <div className="flex items-center gap-1.5">
+              <LanguageSwitcher className="mr-2" />
               <NotificationBell />
               <Link
                 to="/profile"

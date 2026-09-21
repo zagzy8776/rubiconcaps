@@ -6,6 +6,7 @@ import {
   ArrowRight, Menu, X, Shield, Lock, Phone, ChevronRight,
   Landmark, Headphones, Globe2,
 } from 'lucide-react';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 const IMG = {
   hero: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=2400&q=80',
@@ -80,8 +81,12 @@ export default function LandingPage() {
               <Landmark className="w-3.5 h-3.5 text-amber-500/80" /> Institutional banking
             </span>
             <span className="flex items-center gap-1.5">
-              <Headphones className="w-3.5 h-3.5 text-amber-500/80" /> Client services: support@rubiconcapital.org
+              <Headphones className="w-3.5 h-3.5 text-amber-500/80" /> Client services: rubiconcapital@rubiconcapital.org
             </span>
+            <a href="tel:+12136061732" className="flex items-center gap-1.5 hover:text-slate-300">
+              <Phone className="w-3.5 h-3.5 text-amber-500/80" /> +1 (213) 606-1732
+            </a>
+            <LanguageSwitcher />
           </div>
           <span>Mon–Fri 08:00–18:00 GMT</span>
         </div>
@@ -413,11 +418,11 @@ export default function LandingPage() {
             <p className="text-slate-400 text-sm mt-1">Mon–Fri 08:00–18:00 GMT</p>
           </div>
           <a
-            href="mailto:support@rubiconcapital.org"
+            href="mailto:rubiconcapital@rubiconcapital.org"
             className="inline-flex items-center gap-2 text-amber-400 hover:text-amber-300 transition text-sm font-medium"
           >
             <Phone className="w-4 h-4" />
-            support@rubiconcapital.org
+            rubiconcapital@rubiconcapital.org
           </a>
         </div>
       </section>

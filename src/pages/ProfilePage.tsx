@@ -8,11 +8,12 @@ import { SettingsRow, SettingsSection, SettingsToggle } from '../components/ui/S
 import {
   Bell, Calendar, Globe2, HelpCircle, KeyRound, Landmark,
   LifeBuoy, Lock, LogOut, Mail, MapPin, Phone, ShieldCheck, Smartphone,
-  User, FileText, Scale, Info,
+  User, FileText, Scale, Info, Camera,
 } from 'lucide-react';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
-const SUPPORT_WHATSAPP = '+447448216273';
-const SUPPORT_WHATSAPP_LINK = 'https://wa.me/447448216273';
+const SUPPORT_WHATSAPP = '+12136061732';
+const SUPPORT_WHATSAPP_LINK = 'https://wa.me/12136061732';
 
 function getInitials(name?: string) {
   if (!name) return '?';
@@ -157,16 +158,31 @@ export default function ProfilePage() {
 
         <Card className="p-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xl shrink-0 overflow-hidden">
+            <label className="relative w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xl shrink-0 overflow-hidden cursor-pointer group" title="Upload photo">
               {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : getInitials(user?.full_name)}
-            </div>
+              <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <Camera className="w-5 h-5 text-white" />
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(e) => { void handleAvatarFile(e.target.files?.[0]); e.target.value = ''; }}
+              />
+            </label>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-content-primary truncate">{user?.full_name}</h2>
               <p className="text-caption text-content-muted truncate">{user?.email}</p>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <StatusBadge status={user?.is_locked ? 'locked' : 'active'} />
                 <Badge tone="neutral" dot>Email on file</Badge>
               </div>
+              <p className="text-caption text-content-muted mt-1">Tap photo to upload · JPEG/PNG</p>
+              {avatarUrl && (
+                <button type="button" className="text-caption text-content-muted hover:text-red-300 mt-1" onClick={() => void handleRemoveAvatar()}>
+                  Remove photo
+                </button>
+              )}
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-line-subtle flex items-center justify-between text-caption text-content-muted">
@@ -204,7 +220,16 @@ export default function ProfilePage() {
           <SettingsRow icon={Bell} label="Transfer alerts" value={notifTransfers ? 'On' : 'Off'} trailing={<SettingsToggle enabled={notifTransfers} onChange={(v) => { setNotifTransfers(v); void savePref('notify_transfers', v); }} label="Toggle transfer alerts" />} />
           <SettingsRow icon={Bell} label="Deposit alerts" value={notifDeposits ? 'On' : 'Off'} trailing={<SettingsToggle enabled={notifDeposits} onChange={(v) => { setNotifDeposits(v); void savePref('notify_deposits', v); }} label="Toggle deposit alerts" />} />
           <SettingsRow icon={Landmark} label="Default Currency" value="GBP" />
-          <SettingsRow icon={Globe2} label="Language" value="English" />
+          <div className="px-5 py-3 flex items-center justify-between gap-3 border-b border-line-subtle">
+            <div className="flex items-center gap-3 min-w-0">
+              <Globe2 className="w-4 h-4 text-content-muted shrink-0" />
+              <div>
+                <p className="text-sm text-content-primary">Language</p>
+                <p className="text-caption text-content-muted">Translate the app for your preferred language</p>
+              </div>
+            </div>
+            <LanguageSwitcher />
+          </div>
         </SettingsSection>
 
         <SettingsSection title="Support & Legal">
@@ -214,7 +239,7 @@ export default function ProfilePage() {
             value={SUPPORT_WHATSAPP}
             onClick={() => { window.location.href = SUPPORT_WHATSAPP_LINK; }}
           />
-          <SettingsRow icon={LifeBuoy} label="Email support" value="support@rubiconcapital.org" onClick={() => { window.location.href = 'mailto:support@rubiconcapital.org'; }} />
+          <SettingsRow icon={LifeBuoy} label="Email support" value="rubiconcapital@rubiconcapital.org" onClick={() => { window.location.href = 'mailto:rubiconcapital@rubiconcapital.org'; }} />
           <SettingsRow icon={HelpCircle} label="Help Centre" value="FAQs & guides" onClick={() => navigate('/disclosures')} />
           <SettingsRow icon={FileText} label="Terms of Service" onClick={() => navigate('/terms')} />
           <SettingsRow icon={Scale} label="Privacy Policy" onClick={() => navigate('/privacy')} />

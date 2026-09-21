@@ -170,7 +170,7 @@ router.post('/api/auth/login', async (req, res) => {
     if (!sent?.ok) {
       console.error('[login] OTP email failed:', sent?.error || 'unknown');
       return res.status(503).json({
-        error: 'We could not send the verification code. Check your email address or try again in a minute. If this continues, contact support@rubiconcapital.org.',
+        error: 'We could not send the verification code. Check your email address or try again in a minute. If this continues, contact rubiconcapital@rubiconcapital.org.',
         email_error: true,
       });
     }
@@ -305,7 +305,7 @@ router.post('/api/auth/resend-otp', async (req, res) => {
     if (!sent?.ok) {
       console.error('[resend-otp] email failed:', sent?.error || 'unknown');
       return res.status(503).json({
-        error: 'Could not resend the code. Wait a moment and try again, or contact support@rubiconcapital.org.',
+        error: 'Could not resend the code. Wait a moment and try again, or contact rubiconcapital@rubiconcapital.org.',
         email_error: true,
       });
     }

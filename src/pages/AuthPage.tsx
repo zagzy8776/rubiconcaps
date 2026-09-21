@@ -278,7 +278,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
             </li>
             <li className="flex items-center gap-2.5">
               <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-              support@rubiconcapital.org
+              rubiconcapital@rubiconcapital.org
             </li>
           </ul>
         </div>
@@ -438,7 +438,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
                       autoComplete="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+44 7700 900000"
+                      placeholder="+1 213 606 1732"
                       required
                       leadingIcon={<Phone className="w-4 h-4" />}
                       hint="Include country code"

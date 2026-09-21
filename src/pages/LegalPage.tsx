@@ -31,7 +31,7 @@ const BODY: Record<Doc, string[]> = {
     'Deposit requests require administrative review before funds appear as available balance. Transfers between same-currency accounts on the platform may credit instantly when both sides exist in the ledger.',
     'Crypto balances are simulated until real custody or exchange integrations are enabled. Do not send real digital assets to addresses displayed in this demo.',
     'Nothing on this site constitutes investment, tax, or legal advice. Past or simulated performance is not a guarantee of future results.',
-    'For support contact support@rubiconcapital.org or the channels published on the site.',
+    'For support contact rubiconcapital@rubiconcapital.org or the channels published on the site.',
   ],
 };
 

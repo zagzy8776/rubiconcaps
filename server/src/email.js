@@ -15,7 +15,7 @@ const APP_URL =
   'https://www.rubiconcapital.org';
 const SUPPORT =
   process.env.SUPPORT_EMAIL ||
-  'support@rubiconcapital.org';
+  'rubiconcapital@rubiconcapital.org';
 
 export function money(amount, currency = 'USD') {
   const n = Number(amount);

@@ -15,6 +15,7 @@ interface User {
   account_status?: string;
   created_at?: string;
   last_login?: string;
+  avatar_url?: string;
 }
 
 export interface OtpChallenge {

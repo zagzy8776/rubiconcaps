@@ -62,6 +62,10 @@ export const api = {
   resendOtp: (body: { challenge_id: string }) =>
     request('/auth/resend-otp', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request('/auth/me'),
+  uploadAvatar: (image: string) =>
+    request('/profile/avatar', { method: 'PATCH', body: JSON.stringify({ image }) }),
+  removeAvatar: () =>
+    request('/profile/avatar', { method: 'PATCH', body: JSON.stringify({ image: '' }) }),
 
   changePassword: (body: { current_password: string; new_password: string }) =>
     request('/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),

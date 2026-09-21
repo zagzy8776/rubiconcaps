@@ -130,4 +130,30 @@ router.patch('/api/profile', authMiddleware, async (req, res) => {
   }
 });
 
+
+router.patch('/api/profile/avatar', authMiddleware, async (req, res) => {
+  try {
+    const image = String(req.body?.image || req.body?.avatar_url || '');
+    if (image === '' || image === 'null') {
+      await query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT`).catch(() => {});
+      await query(`UPDATE profiles SET avatar_url = NULL WHERE id = $1`, [req.user.id]);
+      const user = await getProfile(req.user.id);
+      return res.json({ success: true, user });
+    }
+    if (!image.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Upload a JPEG or PNG image' });
+    }
+    if (image.length > 450000) {
+      return res.status(400).json({ error: 'Photo is too large. Use a smaller picture (under ~300KB).' });
+    }
+    await query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT`).catch(() => {});
+    await query(`UPDATE profiles SET avatar_url = $1 WHERE id = $2`, [image, req.user.id]);
+    const user = await getProfile(req.user.id);
+    res.json({ success: true, user });
+  } catch (err) {
+    console.error('profile avatar:', err);
+    res.status(500).json({ error: err.message || 'Could not save photo' });
+  }
+});
+
 export default router;

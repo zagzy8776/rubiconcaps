@@ -118,7 +118,7 @@ export function ErrorState({
   title = 'We could not load this',
   onRetry,
   retryLabel = 'Try again',
-  hint = 'If the problem continues, contact client services on +44 (0) 20 7946 0958.',
+  hint = 'If the problem continues, contact client services on +1 (213) 606-1732.',
   className,
 }: ErrorStateProps) {
   return (
