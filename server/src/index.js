@@ -60,34 +60,78 @@ app.post('/api/auth/register', async (req, res) => {
     const { email, password, full_name, phone, date_of_birth, address, country } = req.body || {};
     if (!email || !password || !full_name) return res.status(400).json({ error: 'Email, password and full name are required' });
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    const existing = await query('SELECT id FROM profiles WHERE email = $1', [email.toLowerCase()]);
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existing = await query('SELECT id FROM profiles WHERE email = $1', [normalizedEmail]);
     if (existing.rows.length) return res.status(409).json({ error: 'Email already registered' });
+
     const password_hash = await hashPassword(password);
-    const OWNER_EMAIL = (process.env.OWNER_EMAIL || '').toLowerCase();
-    const role = email.toLowerCase() === OWNER_EMAIL ? 'admin' : 'user';
+    const OWNER_EMAIL = String(process.env.OWNER_EMAIL || '').trim().toLowerCase();
+    const role = normalizedEmail === OWNER_EMAIL ? 'admin' : 'user';
     const countryCode = country ? String(country).trim() : 'GB';
-    const { rows } = await query(
-      `INSERT INTO profiles (email, password_hash, full_name, role, phone, date_of_birth, address, country)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, email, full_name, role, phone, created_at, country`,
-      [
-        email.toLowerCase(),
-        password_hash,
-        String(full_name).trim(),
-        role,
-        phone ? String(phone).trim() : null,
-        date_of_birth || null,
-        address ? String(address).trim() : null,
-        countryCode,
-      ]
+
+    // Production Aiven has older profile schemas in the wild. Only send
+    // columns that really exist; this makes registration forward/backward
+    // compatible without requiring DDL privileges on the request path.
+    const schema = await query(
+      `SELECT column_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'profiles'`
     );
-    const user = rows[0];
+    const available = new Set(schema.rows.map((r) => r.column_name));
+
+    const fields = ['email', 'password_hash', 'full_name'];
+    const values = [normalizedEmail, password_hash, String(full_name).trim()];
+    const push = (field, value) => {
+      if (!available.has(field)) return;
+      fields.push(field);
+      values.push(value);
+    };
+
+    push('role', role);
+    push('phone', phone ? String(phone).trim() : null);
+    push('date_of_birth', date_of_birth || null);
+    push('address', address ? String(address).trim() : null);
+    push('country', countryCode);
+
+    const placeholders = values.map((_, i) => '$' + (i + 1)).join(', ');
+    const { rows } = await query(
+      `INSERT INTO profiles (${fields.join(', ')})
+       VALUES (${placeholders})
+       RETURNING *`,
+      values
+    );
+
+    const created = rows[0];
+    const user = {
+      id: created.id,
+      email: created.email,
+      full_name: created.full_name,
+      role: created.role || role || 'user',
+      ...(Object.prototype.hasOwnProperty.call(created, 'phone') ? { phone: created.phone } : {}),
+      ...(Object.prototype.hasOwnProperty.call(created, 'date_of_birth') ? { date_of_birth: created.date_of_birth } : {}),
+      ...(Object.prototype.hasOwnProperty.call(created, 'address') ? { address: created.address } : {}),
+      ...(Object.prototype.hasOwnProperty.call(created, 'country') ? { country: created.country } : {}),
+      ...(Object.prototype.hasOwnProperty.call(created, 'created_at') ? { created_at: created.created_at } : {}),
+    };
+
     const token = signToken(user);
-    await query(`INSERT INTO activity_log (user_id, action, description) VALUES ($1, 'register', 'New user registered')`, [user.id]).catch(() => {});
+
+    // Activity logging is useful but must never turn a successful signup into
+    // a failed signup when the legacy table/schema is incomplete.
+    await query(
+      `INSERT INTO activity_log (user_id, action, description) VALUES ($1, 'register', 'New user registered')`,
+      [user.id]
+    ).catch((err) => {
+      console.warn('Registration activity log skipped:', err?.message);
+    });
+
     const account = await ensurePrimaryAccount(user.id, {
       fullName: user.full_name,
       country: countryCode,
     });
+
     voidEmail(emailWelcome({ to: user.email, fullName: user.full_name }));
     res.status(201).json({ user, token, account });
   } catch (err) {
@@ -97,12 +141,16 @@ app.post('/api/auth/register', async (req, res) => {
       message: err?.message,
       constraint: err?.constraint,
       detail: err?.detail,
+      table: err?.table,
+      column: err?.column,
     });
+
     const status = Number.isInteger(err?.status) ? err.status : (
       ['40001', '40P01'].includes(err?.code) ? 409 :
       ['08000', '08001', '08003', '08004', '08006', '08007', '57P01', '53300'].includes(err?.code) ? 503 :
       500
     );
+
     res.status(status).json({
       error: status === 503
         ? 'Database temporarily unavailable. Please try again shortly.'
