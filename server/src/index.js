@@ -91,8 +91,23 @@ app.post('/api/auth/register', async (req, res) => {
     voidEmail(emailWelcome({ to: user.email, fullName: user.full_name }));
     res.status(201).json({ user, token, account });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Registration failed' });
+    console.error('Registration failed:', {
+      name: err?.name,
+      code: err?.code,
+      message: err?.message,
+      constraint: err?.constraint,
+      detail: err?.detail,
+    });
+    const status = Number.isInteger(err?.status) ? err.status : (
+      ['40001', '40P01'].includes(err?.code) ? 409 :
+      ['08000', '08001', '08003', '08004', '08006', '08007', '57P01', '53300'].includes(err?.code) ? 503 :
+      500
+    );
+    res.status(status).json({
+      error: status === 503
+        ? 'Database temporarily unavailable. Please try again shortly.'
+        : 'Registration failed',
+    });
   }
 });
 
