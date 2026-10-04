@@ -6,17 +6,27 @@
 import app from '../server/src/index.js';
 import { runMigrations } from '../server/src/migrations.js';
 
-let migrationsStarted = false;
+let migrationPromise;
 
-function kickMigrations() {
-  if (migrationsStarted) return;
-  migrationsStarted = true;
-  runMigrations().catch((err) => {
-    console.error('Migration error:', err.message);
-  });
+function ensureMigrations() {
+  if (!migrationPromise) {
+    migrationPromise = runMigrations().catch((err) => {
+      console.error('Migration error:', err);
+      migrationPromise = undefined;
+      throw err;
+    });
+  }
+  return migrationPromise;
 }
 
 export default async function handler(req, res) {
-  kickMigrations();
+  // Registration and other DB-backed requests must not race the schema bootstrap.
+  try {
+    await ensureMigrations();
+  } catch (err) {
+    return res.status(503).json({
+      error: 'Database initialization is unavailable. Please try again shortly.',
+    });
+  }
   return app(req, res);
 }
