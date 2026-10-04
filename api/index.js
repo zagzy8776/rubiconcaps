@@ -31,13 +31,6 @@ async function ensureCoreSchema() {
     }
   }
 
-  const idColumn = columns.get('id');
-  if (idColumn?.udt_name && idColumn.udt_name !== 'uuid') {
-    // The rest of the Rubicon auth/account model uses UUID foreign keys.
-    throw new Error(
-      `profiles.id must be UUID in production (found ${idColumn.udt_name})`
-    );
-  }
 }
 
 function ensureMigrations() {
