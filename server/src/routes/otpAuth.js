@@ -23,10 +23,11 @@ const challenges = new Map();
 const failCounts = new Map();
 
 async function ensureOtpTable() {
+  // user_id as TEXT — compatible with UUID or text profile ids
   await query(`
     CREATE TABLE IF NOT EXISTS login_otps (
       id TEXT PRIMARY KEY,
-      user_id UUID NOT NULL,
+      user_id TEXT NOT NULL,
       code_hash TEXT NOT NULL,
       expires_at TIMESTAMPTZ NOT NULL,
       attempts INT DEFAULT 0,
