@@ -147,6 +147,9 @@ export const api = {
   reviewWithdrawal: (id: string, body: { status: string; admin_note?: string }) =>
     adminRequest(`/admin/withdrawals/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
+  adminTransfers: (status = 'pending') => adminRequest(`/admin/transfers?status=${status}`),
+  reviewTransfer: (id: string, body: { status: string; admin_note?: string }) =>
+    adminRequest(`/admin/transfers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   adminDeposits: (status = 'all') => adminRequest(`/admin/deposits?status=${status}`),
   reviewDeposit: (id: string, body: { status: string; admin_note?: string }) =>
     adminRequest(`/admin/deposits/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

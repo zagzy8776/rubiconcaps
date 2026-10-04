@@ -167,14 +167,18 @@ export default function Dashboard() {
               <Link
                 to="/profile"
                 aria-label="Profile"
-                className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 text-sm font-bold shadow-[0_0_16px_-4px_rgba(245,158,11,0.5)]"
+                className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 text-sm font-bold shadow-[0_0_16px_-4px_rgba(245,158,11,0.5)] ring-2 ring-amber-400/30"
               >
-                {user?.full_name
-                  ?.split(/\s+/)
-                  .map((w) => w[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2) || '?'}
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user?.full_name
+                    ?.split(/\s+/)
+                    .map((w) => w[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2) || '?'
+                )}
               </Link>
             </div>
           </div>
@@ -194,9 +198,23 @@ export default function Dashboard() {
           <div className="relative p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3 mb-5">
               <div>
-                <p className="text-sm text-slate-300/90">
-                  {greeting}, {user?.full_name?.split(' ')[0] || 'Client'}
-                </p>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 text-xs font-bold ring-2 ring-white/20">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (user?.full_name || 'C')
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase())
+                        .join('') || 'C'
+                    )}
+                  </span>
+                  <p className="text-sm text-slate-300/90">
+                    {greeting}, {user?.full_name?.split(' ')[0] || 'Client'}
+                  </p>
+                </div>
                 <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 mt-1">Available balance</p>
               </div>
               <IconButton

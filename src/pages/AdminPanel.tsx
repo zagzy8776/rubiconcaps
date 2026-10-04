@@ -35,6 +35,7 @@ export default function AdminPanel() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [depositRequests, setDepositRequests] = useState<any[]>([]);
+  const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [cryptoAccounts, setCryptoAccounts] = useState<any[]>([]);
@@ -68,6 +69,8 @@ export default function AdminPanel() {
         setTransactions((await api.adminTransactions(query)).transactions ?? []);
       } else if (target === 'activity') {
         setActivity((await api.adminActivity()).activity ?? []);
+      } else if (target === 'transfers') {
+        try { setPendingTransfers((await api.adminTransfers('pending')).transfers ?? []); } catch { setPendingTransfers([]); }
       } else if (target === 'deposits') {
         try { setDepositRequests((await api.adminDeposits()).deposits ?? []); } catch { setDepositRequests([]); }
       } else if (target === 'withdrawals') {
@@ -121,6 +124,19 @@ export default function AdminPanel() {
     } catch (e: any) {
       setActionError(e?.message || 'Could not update account');
     } finally { setBusy(false); }
+  };
+
+  const handleTransferReview = async (id: string, status: 'completed' | 'blocked') => {
+    setBusy(true);
+    try {
+      await api.reviewTransfer(id, { status });
+      setNotice(status === 'completed' ? 'Transfer released.' : 'Transfer blocked and refunded.');
+      await loadTab('transfers');
+    } catch (e: any) {
+      setNotice(e?.message || 'Transfer review failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDepositReview = async (id: string, status: 'approved' | 'rejected') => {
@@ -296,6 +312,7 @@ export default function AdminPanel() {
             users={users}
             accounts={accounts}
             depositRequests={depositRequests}
+            pendingTransfers={pendingTransfers}
             withdrawalRequests={withdrawalRequests}
             cryptoAccounts={cryptoAccounts}
             auditLogs={auditLogs}
@@ -305,6 +322,7 @@ export default function AdminPanel() {
             handleAccountEdit={handleAccountEdit}
             handleAccountStatus={handleAccountStatus}
             handleDepositReview={handleDepositReview}
+            handleTransferReview={handleTransferReview}
             handleWithdrawalReview={handleWithdrawalReview}
             handleCryptoReview={handleCryptoReview}
             handleCryptoAdjust={handleCryptoAdjust}

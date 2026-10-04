@@ -13,6 +13,7 @@ type Props = {
   accounts: any[];
   depositRequests: any[];
   withdrawalRequests: any[];
+  pendingTransfers?: any[];
   cryptoAccounts: any[];
   auditLogs: any[];
   activity: any[];
@@ -22,6 +23,7 @@ type Props = {
   handleAccountStatus: (id: string, action: string) => void;
   handleDepositReview: (id: string, status: 'approved' | 'rejected') => void;
   handleWithdrawalReview: (id: string, status: 'approved' | 'rejected') => void;
+  handleTransferReview?: (id: string, status: 'completed' | 'blocked') => void;
   handleCryptoReview: (id: string, status: 'active' | 'rejected' | 'suspended') => void;
   handleCryptoAdjust: (id: string, amount: number, reason?: string) => void;
   openCredit: (a: any) => void;
@@ -31,9 +33,9 @@ type Props = {
 
 export function AdminExtraTabs(p: Props) {
   const {
-    tab, users, accounts, depositRequests, withdrawalRequests, cryptoAccounts, auditLogs, activity,
-    toggleUserLock, handleUserEdit, handleAccountEdit, handleAccountStatus, handleDepositReview, handleWithdrawalReview, handleCryptoReview,
-    handleCryptoAdjust, openCredit, openDebit, openCreate,
+    tab, users, accounts, depositRequests, withdrawalRequests, pendingTransfers = [], cryptoAccounts, auditLogs, activity,
+    toggleUserLock, handleUserEdit, handleAccountEdit, handleAccountStatus, handleDepositReview, handleWithdrawalReview, handleTransferReview,
+    handleCryptoReview, handleCryptoAdjust, openCredit, openDebit, openCreate,
   } = p;
 
   if (tab === 'users') {
@@ -105,6 +107,45 @@ export function AdminExtraTabs(p: Props) {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+    );
+  }
+
+  
+  if (tab === 'transfers') {
+    return (
+      <div className="animate-fade-in">
+        <SectionHeading title="Held transfers" icon={ClipboardList} />
+        <p className="text-sm text-content-muted mb-4">
+          New transfers stay pending until you release (complete) or block (refund) them.
+        </p>
+        {pendingTransfers.length === 0 ? (
+          <EmptyState icon={ClipboardList} title="No pending transfers" description="Outbound transfers awaiting review appear here." />
+        ) : (
+          <div className="space-y-3">
+            {pendingTransfers.map((tr: any) => (
+              <div key={tr.id} className="rounded-xl border border-line-subtle bg-surface-raised p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-content-primary">
+                    {formatMoney(Math.abs(parseFloat(tr.amount)), tr.currency || tr.account_currency)}
+                  </p>
+                  <p className="text-caption text-content-muted truncate">
+                    {tr.customer_name || 'Customer'} · {tr.from_account_number || '—'} → {tr.description || tr.reference}
+                  </p>
+                  <p className="text-micro text-content-muted mt-1">{formatDate(tr.created_at)} · {tr.status || 'pending'}</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" variant="success" onClick={() => handleTransferReview?.(tr.id, 'completed')}>
+                    Release
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => handleTransferReview?.(tr.id, 'blocked')}>
+                    Block
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     );

@@ -25,6 +25,7 @@ import emailOpsRoutes from './routes/emailOps.js';
 import cronRoutes from './routes/cron.js';
 import otpAuthRoutes from './routes/otpAuth.js';
 import withdrawalRoutes from './routes/withdrawals.js';
+import avatarRoutes from './routes/avatar.js';
 import { mountCoreA } from './routes/coreA.js';
 import { mountCoreB } from './routes/coreB.js';
 
@@ -41,6 +42,7 @@ app.use(express.json());
 
 app.use(otpAuthRoutes);
 app.use(withdrawalRoutes);
+app.use(avatarRoutes);
 app.use(depositRoutes);
 app.use(transferRoutes);
 app.use(payeeLookupRoutes);
