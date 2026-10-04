@@ -53,7 +53,8 @@ function ensureMigrations() {
         table: err?.table,
         column: err?.column,
       });
-      migrationPromise = undefined;
+      // Do not retry a known legacy-schema migration failure on every request.
+      // A fresh serverless instance can try again naturally.
     });
   }
   return migrationPromise;
