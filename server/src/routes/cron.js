@@ -4,8 +4,12 @@
  *   Authorization: Bearer <CRON_SECRET>
  *   or header x-cron-secret: <CRON_SECRET>
  *
- * Example:
- *   GET or POST https://www.rubiconcapital.org/api/cron/daily-digest
+ * Keep-alive (prevents Aiven Postgres from sleeping):
+ *   GET/POST https://www.rubiconcapital.org/api/cron/keepalive
+ *   every 5–10 minutes
+ *
+ * Daily digest:
+ *   GET/POST https://www.rubiconcapital.org/api/cron/daily-digest
  */
 import { Router } from 'express';
 import { query } from '../db.js';
@@ -23,6 +27,34 @@ function authorizeCron(req, res, next) {
   const alt = req.headers['x-cron-secret'];
   if (bearer === secret || alt === secret) return next();
   return res.status(401).json({ error: 'Unauthorized cron request' });
+}
+
+/**
+ * Cheap DB touch – forces Aiven to stay awake.
+ * Also warms the Vercel/serverless function.
+ */
+async function runKeepalive(req, res) {
+  const started = Date.now();
+  try {
+    const r = await query('SELECT 1 AS ok, NOW() AS db_time');
+    const ms = Date.now() - started;
+    res.json({
+      ok: true,
+      service: 'rubicon-keepalive',
+      db: r.rows[0]?.ok === 1,
+      db_time: r.rows[0]?.db_time,
+      latency_ms: ms,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('cron keepalive:', err.message);
+    res.status(503).json({
+      ok: false,
+      error: 'Database unreachable',
+      detail: err.message,
+      at: new Date().toISOString(),
+    });
+  }
 }
 
 async function runDailyDigest(req, res) {
@@ -69,8 +101,12 @@ async function runDailyDigest(req, res) {
 router.get('/api/cron/daily-digest', authorizeCron, runDailyDigest);
 router.post('/api/cron/daily-digest', authorizeCron, runDailyDigest);
 
-router.get('/api/cron/health', authorizeCron, (req, res) => {
-  res.json({ ok: true, service: 'rubicon-cron' });
-});
+// Real keep-alive: hits Postgres so Aiven never sleeps
+router.get('/api/cron/keepalive', authorizeCron, runKeepalive);
+router.post('/api/cron/keepalive', authorizeCron, runKeepalive);
+
+// Alias – same behaviour (old clients still work)
+router.get('/api/cron/health', authorizeCron, runKeepalive);
+router.post('/api/cron/health', authorizeCron, runKeepalive);
 
 export default router;
