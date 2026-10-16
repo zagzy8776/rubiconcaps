@@ -15,8 +15,10 @@ async function rawFetch(path: string, options: RequestInit, token: string | null
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
+  // Cold starts (Vercel + DB) can exceed 20s on first request after idle
+  const timeoutMs = 45000;
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 20000);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${API}${path}`, { ...options, headers, signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
@@ -26,7 +28,7 @@ async function rawFetch(path: string, options: RequestInit, token: string | null
     return data;
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      throw new Error('The server took too long. Wait a few seconds and try again.');
+      throw new Error('The server took too long to respond. Wait a few seconds and try again.');
     }
     if (err?.message === 'Failed to fetch' || err?.name === 'TypeError') {
       throw new Error('Cannot reach the API. Wait 20 seconds and try again — the database was overloaded.');
