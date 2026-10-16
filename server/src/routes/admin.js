@@ -213,7 +213,7 @@ router.post('/api/admin/accounts/:id/transactions', authMiddleware, adminMiddlew
         const r = await client.query(
           `INSERT INTO transactions (account_id, user_id, type, amount, currency, description, reference, status)
            VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed') RETURNING *`,
-          [req.params.id, a.user_id, type, amt, a.currency, description || `Simulated ${type}`, reference || `SIM-${Date.now().toString(36).toUpperCase()}`]
+          [req.params.id, a.user_id, type, amt, a.currency, description || `Admin ${type}`, reference || `ADJ-${Date.now().toString(36).toUpperCase()}`]
         );
         txRow = r.rows[0];
       });
@@ -221,7 +221,7 @@ router.post('/api/admin/accounts/:id/transactions', authMiddleware, adminMiddlew
         const r = await client.query(
           `INSERT INTO transactions (account_id, user_id, type, amount, currency, description, reference)
            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-          [req.params.id, a.user_id, type, amt, a.currency, description || `Simulated ${type}`, reference || `SIM-${Date.now().toString(36).toUpperCase()}`]
+          [req.params.id, a.user_id, type, amt, a.currency, description || `Admin ${type}`, reference || `ADJ-${Date.now().toString(36).toUpperCase()}`]
         );
         txRow = r.rows[0];
       }
