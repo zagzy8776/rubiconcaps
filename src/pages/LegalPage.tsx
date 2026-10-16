@@ -11,26 +11,26 @@ const TITLES: Record<Doc, string> = {
 
 const BODY: Record<Doc, string[]> = {
   terms: [
-    'Rubicon Capital provides a multi-currency banking simulation and demonstration platform. Access is subject to these Terms of Use.',
+    'Rubicon Capital provides multi-currency banking services. Access to online banking is subject to these Terms of Use.',
     'You must provide accurate registration details and keep your credentials confidential. You are responsible for activity under your account.',
-    'The platform may include simulated balances, transfers, deposits, and crypto accounts for product demonstration. Simulated ledger entries are not claims on real funds unless expressly stated in a separate written agreement.',
+    'Your account balances, transfers, deposits, and any crypto features are subject to product terms, applicable limits, and verification requirements. Funds availability may depend on clearing, compliance review, and account status.',
     'We may suspend or terminate access for suspected misuse, fraud, or breach of these terms. Admin actions (including balance adjustments) are logged for audit.',
-    'To the fullest extent permitted by law, Rubicon Capital is not liable for indirect or consequential losses arising from use of the demo environment.',
+    'To the fullest extent permitted by law, Rubicon Capital is not liable for indirect or consequential losses arising from use of the online banking services, except where liability cannot be excluded under applicable law.',
     'These terms may be updated from time to time. Continued use after changes constitutes acceptance of the revised terms.',
   ],
   privacy: [
     'We collect account registration data (name, email), authentication credentials (stored as hashed passwords), device/session metadata, and transaction records required to operate the service.',
-    'Data is used to authenticate you, process requests (deposits, transfers, account actions), send transactional emails (security alerts, statements), and meet audit and compliance needs of the simulation.',
+    'Data is used to authenticate you, process requests (deposits, transfers, account actions), send transactional emails (security alerts, statements), and meet audit, security, and regulatory compliance needs.',
     'We do not sell personal data. Service providers (for example email delivery and hosting) process data only to provide the service under contractual obligations.',
     'You may request access or correction of profile information via support channels. Security-related logs may be retained for a limited period for fraud prevention.',
     'Transactional emails are sent from our verified domain. Marketing messages, if any, will require separate consent.',
   ],
   disclosures: [
-    'This environment is primarily a licensed simulation and investor demonstration of product flows before full production rails and third-party API keys are connected.',
-    'Account numbers, routing details, and crypto wallet addresses shown may be generated for the platform and should not be treated as live bank or blockchain settlement instructions unless confirmed in writing.',
-    'Deposit requests require administrative review before funds appear as available balance. Transfers between same-currency accounts on the platform may credit instantly when both sides exist in the ledger.',
-    'Crypto balances are simulated until real custody or exchange integrations are enabled. Do not send real digital assets to addresses displayed in this demo.',
-    'Nothing on this site constitutes investment, tax, or legal advice. Past or simulated performance is not a guarantee of future results.',
+    'Rubicon Capital provides multi-currency banking services, including accounts, transfers, deposits, and related digital banking features, subject to applicable law and account terms.',
+    'Account numbers, routing details, and payment instructions displayed in your account are issued for use with Rubicon Capital. Always verify details within your secure online banking session before sending funds.',
+    'Deposit requests may be subject to review and verification before funds become available. Same-currency transfers between eligible accounts on the platform are typically processed promptly when both accounts are active and in good standing.',
+    'Crypto-related balances and wallet features, where offered, are subject to the terms of those products. Only send digital assets to addresses shown in your authenticated account after confirming they are current and intended for that purpose.',
+    'Nothing on this site constitutes investment, tax, or legal advice. Account balances, rates, and product availability may change. Past performance is not a guarantee of future results.',
     'For support contact rubiconcapital@rubiconcapital.org or the channels published on the site.',
   ],
 };
