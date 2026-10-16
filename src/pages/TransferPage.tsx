@@ -20,7 +20,7 @@ const RAILS = {
   },
   wire: {
     label: 'Wire transfer',
-    hint: 'Wire routing is 9 digits (same family as ACH) and usually starts with 0, 1, 2 or 3 — e.g. 021000021.',
+    hint: '',
     timing: 'Same day if sent before cut-off',
   },
   swift: {
