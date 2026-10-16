@@ -24,15 +24,36 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function buildConfig() {
-  let connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
-  if (connectionString) {
-    connectionString = connectionString
+/**
+ * Normalize a Postgres connection string for node-pg on Vercel.
+ * - Forces sslmode=no-verify (we also set ssl.rejectUnauthorized = false)
+ * - Drops channel_binding
+ */
+function normalizeConnectionString(raw) {
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    u.searchParams.delete('sslmode');
+    u.searchParams.delete('ssl');
+    u.searchParams.delete('channel_binding');
+    u.searchParams.set('sslmode', 'no-verify');
+    return u.toString();
+  } catch {
+    let s = String(raw)
       .replace(/[?&]sslmode=[^&]*/gi, '')
-      .replace(/[?&]ssl=[^&]*/gi, '');
-    const join = connectionString.includes('?') ? '&' : '?';
-    connectionString = `${connectionString}${join}sslmode=no-verify`;
+      .replace(/[?&]ssl=[^&]*/gi, '')
+      .replace(/[?&]channel_binding=[^&]*/gi, '')
+      .replace(/\?&/, '?')
+      .replace(/&&+/g, '&')
+      .replace(/[?&]$/, '');
+    const join = s.includes('?') ? '&' : '?';
+    return `${s}${join}sslmode=no-verify`;
   }
+}
+
+function buildConfig() {
+  const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  const connectionString = normalizeConnectionString(raw);
   const serverless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   return {
     ...(connectionString
@@ -48,7 +69,7 @@ function buildConfig() {
     max: serverless ? 1 : 3,
     min: 0,
     idleTimeoutMillis: serverless ? 4000 : 20000,
-    connectionTimeoutMillis: 8000,
+    connectionTimeoutMillis: 12000,
     allowExitOnIdle: true,
   };
 }
