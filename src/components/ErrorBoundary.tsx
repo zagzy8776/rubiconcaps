@@ -10,6 +10,17 @@ export class ErrorBoundary extends Component<
     return { error };
   }
 
+  private handleReload = () => {
+    // Clear leftover Google Translate state so the next load is clean
+    try {
+      document.cookie = 'googtrans=;path=/;max-age=0';
+      document.cookie = 'googtrans=;path=/;domain=' + window.location.hostname + ';max-age=0';
+    } catch {
+      /* ignore */
+    }
+    window.location.reload();
+  };
+
   render() {
     if (this.state.error) {
       return (
@@ -20,7 +31,7 @@ export class ErrorBoundary extends Component<
             <button
               type="button"
               className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900"
-              onClick={() => window.location.assign('/dashboard')}
+              onClick={this.handleReload}
             >
               Reload
             </button>
