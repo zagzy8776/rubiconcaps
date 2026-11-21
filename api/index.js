@@ -1,6 +1,6 @@
 /**
  * Vercel Serverless Function entry point.
- * Keeps the API available against the legacy Aiven schema. Registration is
+ * Keeps the API available against the legacy schema. Registration is
  * schema-adaptive, so optional/new columns do not take the whole API offline.
  */
 import app from '../server/src/index.js';

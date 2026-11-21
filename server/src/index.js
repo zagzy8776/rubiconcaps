@@ -70,7 +70,7 @@ app.post('/api/auth/register', async (req, res) => {
     const role = normalizedEmail === OWNER_EMAIL ? 'admin' : 'user';
     const countryCode = country ? String(country).trim() : 'GB';
 
-    // Production Aiven has older profile schemas in the wild. Only send
+    // Production databases may have older profile schemas. Only send
     // columns that really exist; this makes registration forward/backward
     // compatible without requiring DDL privileges on the request path.
     const schema = await query(

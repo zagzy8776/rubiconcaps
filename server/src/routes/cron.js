@@ -4,7 +4,7 @@
  *   Authorization: Bearer <CRON_SECRET>
  *   or header x-cron-secret: <CRON_SECRET>
  *
- * Keep-alive (prevents Aiven Postgres from sleeping):
+ * Keep-alive (prevents the database from sleeping (Neon auto-suspend)):
  *   GET/POST https://www.rubiconcapital.org/api/cron/keepalive
  *   every 5–10 minutes
  *
@@ -30,7 +30,7 @@ function authorizeCron(req, res, next) {
 }
 
 /**
- * Cheap DB touch – forces Aiven to stay awake.
+ * Cheap DB touch – forces the database to stay awake.
  * Also warms the Vercel/serverless function.
  */
 async function runKeepalive(req, res) {
@@ -101,7 +101,7 @@ async function runDailyDigest(req, res) {
 router.get('/api/cron/daily-digest', authorizeCron, runDailyDigest);
 router.post('/api/cron/daily-digest', authorizeCron, runDailyDigest);
 
-// Real keep-alive: hits Postgres so Aiven never sleeps
+// Real keep-alive: hits Postgres so the database never sleeps
 router.get('/api/cron/keepalive', authorizeCron, runKeepalive);
 router.post('/api/cron/keepalive', authorizeCron, runKeepalive);
 

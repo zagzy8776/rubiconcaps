@@ -6,7 +6,7 @@ Professional multi-currency private banking platform (GBP / USD / EUR).
 
 - **Frontend**: React + TypeScript + Vite + Tailwind
 - **Backend**: Node.js + Express + JWT
-- **Database**: Aiven PostgreSQL
+- **Database**: Neon PostgreSQL
 
 ## Features
 
@@ -24,7 +24,7 @@ Professional multi-currency private banking platform (GBP / USD / EUR).
 
 ## Setup
 
-1. Copy `.env.example` → `.env` and fill in your Aiven credentials + JWT_SECRET
+1. Copy `.env.example` → `.env` and fill in your Neon `DATABASE_URL` + JWT_SECRET
 2. Install dependencies:
 
 ```bash
